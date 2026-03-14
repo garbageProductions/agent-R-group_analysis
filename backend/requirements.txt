@@ -1,0 +1,19 @@
+# Core
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+python-dotenv>=1.0.0
+aiofiles>=23.2.1
+
+# Cheminformatics
+rdkit>=2023.9.6
+
+# AI / Agents
+anthropic>=0.28.0
+
+# Data / Stats
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.13.0
+scikit-learn>=1.4.0
