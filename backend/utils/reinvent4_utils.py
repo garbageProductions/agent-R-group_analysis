@@ -133,13 +133,85 @@ def _build_scoring_components(scaffold_smarts: str, scoring_config: Dict[str, An
 
 
 def run_reinvent4(toml_path: Path, exec_path: str) -> Path:
-    """Stub — implemented in Task 4."""
-    raise NotImplementedError("run_reinvent4 not yet implemented")
+    """
+    Invoke the REINVENT4 CLI subprocess.
+
+    Args:
+        toml_path:  Path to the REINVENT4 TOML config file
+        exec_path:  Path to the reinvent executable (from REINVENT4_EXEC env var)
+
+    Returns:
+        Path to the output CSV file
+
+    Raises:
+        Reinvent4RunFailed: on non-zero subprocess exit
+    """
+    toml_path = Path(toml_path)
+    result = subprocess.run(
+        [exec_path, "-i", str(toml_path)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise Reinvent4RunFailed(stderr=result.stderr, returncode=result.returncode)
+
+    output_csv = toml_path.parent / "results" / "scaffold_decoration.csv"
+    logger.info(f"REINVENT4 completed. Output: {output_csv}")
+    return output_csv
 
 
 def parse_results(csv_path: Path, top_n: int = 50) -> List[Dict[str, Any]]:
-    """Stub — implemented in Task 4."""
-    raise NotImplementedError("parse_results not yet implemented")
+    """
+    Parse REINVENT4 output CSV into a deduplicated, sorted list.
+
+    Columns expected: SMILES, Score, [optional: per-component scores], Step
+
+    Args:
+        csv_path:  Path to REINVENT4 output CSV
+        top_n:     Maximum number of results to return (by composite Score)
+
+    Returns:
+        List of dicts sorted by composite_score descending, deduplicated by
+        canonical SMILES.  Each dict: {smiles, canonical_smiles, composite_score,
+        qsar_score, qed, sa_score, step, iteration}
+    """
+    csv_path = Path(csv_path)
+    rows = []
+
+    with csv_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            smiles = row.get("SMILES", "").strip()
+            if not smiles:
+                continue
+            mol = Chem.MolFromSmiles(smiles)
+            canonical = Chem.MolToSmiles(mol) if mol else smiles
+
+            try:
+                score = float(row.get("Score", 0.0))
+            except (ValueError, TypeError):
+                score = 0.0
+
+            rows.append({
+                "smiles": smiles,
+                "canonical_smiles": canonical,
+                "composite_score": score,
+                "qsar_score": _safe_float(row.get("predictive_property") or row.get("qsar_score")),
+                "qed": _safe_float(row.get("qed_score") or row.get("qed")),
+                "sa_score": _safe_float(row.get("sa_score")),
+                "step": _safe_int(row.get("Step")),
+                "iteration": None,  # Filled in by Reinvent4Agent after parse
+            })
+
+    # Deduplicate by canonical SMILES — keep highest score
+    seen: Dict[str, Dict] = {}
+    for row in rows:
+        key = row["canonical_smiles"]
+        if key not in seen or row["composite_score"] > seen[key]["composite_score"]:
+            seen[key] = row
+
+    sorted_results = sorted(seen.values(), key=lambda r: r["composite_score"], reverse=True)
+    return sorted_results[:top_n]
 
 
 def _safe_float(val) -> float:
