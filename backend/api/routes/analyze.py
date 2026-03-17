@@ -19,6 +19,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
+class GenerativeConfig(BaseModel):
+    """Configuration for REINVENT4 generative runs. Task 7 will expand this."""
+
+    scoring_mode: str = "physico"  # "physico" | "qsar" | "both"
+    n_iterations: int = 5
+    n_steps: int = 500
+
+
 class AnalysisRequest(BaseModel):
     session_id: str
     property_of_interest: Optional[str] = None
