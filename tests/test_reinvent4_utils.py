@@ -36,7 +36,7 @@ class TestBuildToml:
     def test_toml_contains_n_steps(self, tmp_output_dir):
         path = build_toml("[*:1]c1ccccc1", {"components": []}, 250, tmp_output_dir)
         content = path.read_text()
-        assert "250" in content
+        assert "n_steps = 250" in content
 
     def test_toml_contains_sigma(self, tmp_output_dir):
         path = build_toml("[*:1]c1ccccc1", {"components": []}, 500, tmp_output_dir, sigma=120)
@@ -80,3 +80,14 @@ class TestBuildToml:
         path = build_toml("[*:1]c1ccccc1", {"components": []}, 500, tmp_output_dir)
         content = path.read_text()
         assert "IdenticalMurckoScaffold" in content
+
+    def test_qsar_absent_without_config(self, tmp_output_dir):
+        path = build_toml("[*:1]c1ccccc1", {"components": []}, 500, tmp_output_dir)
+        content = path.read_text()
+        assert "predictive_property" not in content
+        assert "qsar_activity" not in content
+
+    def test_raises_on_qsar_missing_model_path(self, tmp_output_dir):
+        scoring_config = {"components": [{"type": "qsar_activity", "weight": 0.6}]}  # no model_path
+        with pytest.raises(ValueError, match="model_path"):
+            build_toml("[*:1]c1ccccc1", scoring_config, 500, tmp_output_dir)

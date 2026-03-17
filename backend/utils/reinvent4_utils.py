@@ -93,13 +93,18 @@ def _build_scoring_components(scaffold_smarts: str, scoring_config: Dict[str, An
     # Add QSAR component if provided
     for comp in scoring_config.get("components", []):
         if comp.get("type") == "qsar_activity":
+            model_path = comp.get("model_path")
+            if not model_path:
+                raise ValueError(
+                    "qsar_activity scoring component requires a 'model_path' entry"
+                )
             lines.append("    [[stage.scoring.component]]")
             lines.append("      [stage.scoring.component.predictive_property]")
             lines.append(f'        name = "qsar_activity"')
             lines.append(f'        weight = {comp.get("weight", 0.6)}')
             lines.append("        [[stage.scoring.component.predictive_property.endpoint]]")
             lines.append('          name = "model"')
-            lines.append(f'          path = "{comp["model_path"]}"')
+            lines.append(f'          path = "{model_path}"')
             lines.append('          scikit-learn = true')
             lines.append("")
 
