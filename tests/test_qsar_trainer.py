@@ -1,5 +1,6 @@
 """Unit tests for QSARTrainer."""
 
+import numpy as np
 import pytest
 from pathlib import Path
 from unittest.mock import patch
@@ -12,7 +13,6 @@ class TestQSARTrainerHappyPath:
 
     @pytest.fixture(autouse=True)
     def mock_cv(self):
-        import numpy as np
         with patch("backend.utils.qsar_trainer.cross_val_score",
                    return_value=np.array([0.40, 0.35, 0.38, 0.42, 0.37])) as m:
             yield m
@@ -48,6 +48,13 @@ class TestQSARTrainerHappyPath:
         trainer = QSARTrainer()
         result = trainer.train(sample_smiles, sample_activity, tmp_output_dir)
         assert result["scoring_component_config"]["model_path"] == str(result["model_path"])
+
+    def test_cv_called_with_correct_folds(self, mock_cv, sample_smiles, sample_activity, tmp_output_dir):
+        QSARTrainer().train(sample_smiles, sample_activity, tmp_output_dir)
+        mock_cv.assert_called_once()
+        _, kwargs = mock_cv.call_args
+        assert kwargs.get("cv") == 5
+        assert kwargs.get("scoring") == "r2"
 
 
 class TestQSARTrainerFallback:

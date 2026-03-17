@@ -54,13 +54,29 @@ class QSARTrainer:
         Raises:
             QSARTrainingFailed: if dataset is too small or model quality is insufficient
         """
-        if len(smiles) < MIN_SAMPLES:
+        if len(smiles) != len(activity):
             raise QSARTrainingFailed(
-                f"Too few training samples: {len(smiles)} < {MIN_SAMPLES} required"
+                f"smiles and activity must have equal length: {len(smiles)} != {len(activity)}"
             )
 
-        X = self._smiles_to_fingerprints(smiles)
-        y = np.array(activity, dtype=float)
+        # Filter out invalid SMILES before featurization
+        valid_pairs = [
+            (smi, act) for smi, act in zip(smiles, activity)
+            if Chem.MolFromSmiles(smi) is not None
+        ]
+        n_dropped = len(smiles) - len(valid_pairs)
+        if n_dropped > 0:
+            logger.warning(f"Dropped {n_dropped} invalid SMILES from training set")
+
+        if len(valid_pairs) < MIN_SAMPLES:
+            raise QSARTrainingFailed(
+                f"Too few training samples: {len(valid_pairs)} < {MIN_SAMPLES} required"
+            )
+
+        valid_smiles = [p[0] for p in valid_pairs]
+        valid_activity = [p[1] for p in valid_pairs]
+        X = self._smiles_to_fingerprints(valid_smiles)
+        y = np.array(valid_activity, dtype=float)
 
         model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
         cv_scores = cross_val_score(model, X, y, cv=CV_FOLDS, scoring="r2")
@@ -97,9 +113,6 @@ class QSARTrainer:
         fps = []
         for smi in smiles:
             mol = Chem.MolFromSmiles(smi)
-            if mol is None:
-                fps.append(np.zeros(FP_NBITS, dtype=np.uint8))
-                continue
             fp = AllChem.GetMorganFingerprintAsBitVect(mol, FP_RADIUS, nBits=FP_NBITS)
             fps.append(np.array(fp, dtype=np.uint8))
         return np.vstack(fps)
