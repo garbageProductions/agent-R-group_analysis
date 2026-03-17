@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 CV_FOLDS = 5
 MIN_SAMPLES = 10
-MIN_R2 = -1.0
+MIN_R2 = 0.3
 FP_RADIUS = 2
 FP_NBITS = 2048
 

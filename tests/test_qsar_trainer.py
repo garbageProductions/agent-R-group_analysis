@@ -8,6 +8,15 @@ from backend.utils.qsar_trainer import QSARTrainer, QSARTrainingFailed
 
 
 class TestQSARTrainerHappyPath:
+    """Happy path tests mock cross_val_score to avoid dependency on dataset size."""
+
+    @pytest.fixture(autouse=True)
+    def mock_cv(self):
+        import numpy as np
+        with patch("backend.utils.qsar_trainer.cross_val_score",
+                   return_value=np.array([0.40, 0.35, 0.38, 0.42, 0.37])) as m:
+            yield m
+
     def test_train_returns_model_path(self, sample_smiles, sample_activity, tmp_output_dir):
         trainer = QSARTrainer()
         result = trainer.train(sample_smiles, sample_activity, tmp_output_dir)
