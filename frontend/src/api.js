@@ -91,6 +91,10 @@ export const getMolSvgUrl  = (sessionId, idx, w = 250, h = 200) =>
 export const getSmilesSvgUrl = (smiles, w = 250, h = 200) =>
   `${BASE}/results/svg/smiles?smiles=${encodeURIComponent(smiles)}&width=${w}&height=${h}`
 
+// ── Upload SVG (before analysis, for side panel) ───────────────────────────
+export const getSvgUrl = (sessionId, index, width = 48, height = 36) =>
+  `${BASE}/upload/session/${sessionId}/svg/${index}?width=${width}&height=${height}`
+
 // ── Chat history (REST) ────────────────────────────────────────────────────────
 export const getChatHistory    = ()         => request('/chat/history')
 export const getChatSession    = (id)       => request(`/chat/history/${id}`)
