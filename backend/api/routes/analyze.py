@@ -6,11 +6,11 @@ import asyncio
 import json
 import logging
 import os
-from typing import Optional
+from typing import Literal, Optional
 
 import anthropic
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.agents.orchestrator import OrchestratorAgent
 from backend.api.routes.upload import get_session_data, store_results
@@ -20,11 +20,9 @@ router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
 class GenerativeConfig(BaseModel):
-    """Configuration for REINVENT4 generative runs. Task 7 will expand this."""
-
-    scoring_mode: str = "physico"  # "physico" | "qsar" | "both"
-    n_iterations: int = 5
-    n_steps: int = 500
+    scoring_mode: Literal["physico", "qsar", "both"] = "both"
+    n_iterations: int = Field(default=5, ge=1, le=20)
+    n_steps: int = Field(default=500, ge=100, le=5000)
 
 
 class AnalysisRequest(BaseModel):
@@ -34,6 +32,9 @@ class AnalysisRequest(BaseModel):
     run_enumeration: bool = False
     similarity_threshold: float = 0.7
     activity_diff_threshold: float = 1.0
+    # Generative design fields:
+    run_generative: bool = False
+    generative_config: Optional[GenerativeConfig] = None
 
 
 # Track running analyses
@@ -92,6 +93,8 @@ async def _run_pipeline(request: AnalysisRequest, session_data: dict, api_key: s
             property_of_interest=request.property_of_interest,
             run_enumeration=request.run_enumeration,
             core_smarts=request.core_smarts,
+            run_generative=request.run_generative,
+            generative_config=request.generative_config,
         )
 
         _results[sid] = {
