@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.utils.file_parsers import parse_upload, parse_activity_csv
-from backend.utils.mol_utils import mol_to_svg
+from backend.utils.mol_utils import mol_to_svg, mol_to_3d_sdf
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -197,3 +197,25 @@ async def get_molecule_svg(
     if svg is None:
         raise HTTPException(status_code=422, detail="SVG generation failed for this molecule")
     return Response(content=svg, media_type="image/svg+xml")
+
+
+@router.get("/session/{session_id}/mol3d/{mol_index}")
+async def get_molecule_3d(session_id: str, mol_index: int):
+    """
+    Generate and return a 3D SDF for a single molecule from the session.
+    Uses RDKit ETKDGv3 + MMFF optimisation. Returns 422 if 3D generation fails.
+    """
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = _sessions[session_id]
+    smiles_list = session["smiles"]
+    if mol_index < 0 or mol_index >= len(smiles_list):
+        raise HTTPException(status_code=404, detail=f"Molecule index {mol_index} out of range")
+    from fastapi.responses import Response
+    sdf = mol_to_3d_sdf(smiles_list[mol_index])
+    if sdf is None:
+        raise HTTPException(
+            status_code=422,
+            detail="3D coordinate generation failed for this molecule",
+        )
+    return Response(content=sdf, media_type="chemical/x-mdl-sdfile")

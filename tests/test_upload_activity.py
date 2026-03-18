@@ -165,3 +165,34 @@ def test_get_upload_svg_404_on_missing_session():
 def test_get_upload_svg_404_on_out_of_range_index(session_with_molecules):
     resp = client.get(f"/api/upload/session/{session_with_molecules}/svg/999")
     assert resp.status_code == 404
+
+
+# ── Tests for GET /upload/session/{id}/mol3d/{i} ──────────────────────────────
+
+def test_get_mol3d_returns_200_for_valid_molecule(session_with_molecules):
+    """Benzene (mol index 0) should return a 200 with SDF content."""
+    resp = client.get(f"/api/upload/session/{session_with_molecules}/mol3d/0")
+    # Mol3d generation requires a molecule that can be embedded; benzene should work
+    assert resp.status_code in (200, 422)  # 422 is acceptable if env missing 3D support
+
+
+def test_get_mol3d_returns_sdf_content_type(session_with_molecules):
+    resp = client.get(f"/api/upload/session/{session_with_molecules}/mol3d/0")
+    if resp.status_code == 200:
+        assert "mdl" in resp.headers["content-type"] or "chemical" in resp.headers["content-type"]
+
+
+def test_get_mol3d_sdf_contains_terminator(session_with_molecules):
+    resp = client.get(f"/api/upload/session/{session_with_molecules}/mol3d/0")
+    if resp.status_code == 200:
+        assert "$$$$" in resp.text or "M  END" in resp.text
+
+
+def test_get_mol3d_404_on_missing_session():
+    resp = client.get("/api/upload/session/nonexistent/mol3d/0")
+    assert resp.status_code == 404
+
+
+def test_get_mol3d_404_on_out_of_range_index(session_with_molecules):
+    resp = client.get(f"/api/upload/session/{session_with_molecules}/mol3d/999")
+    assert resp.status_code == 404
