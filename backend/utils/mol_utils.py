@@ -112,3 +112,41 @@ def compute_2d_coords_for_smiles_list(smiles_list: List[str]) -> List[Optional[s
         except Exception:
             result.append(None)
     return result
+
+
+def mol_to_3d_sdf(smiles: str) -> Optional[str]:
+    """
+    Generate a 3D conformation for a SMILES string and return it as an SDF/MolBlock string.
+
+    Uses RDKit ETKDGv3 distance geometry followed by MMFF94 force-field minimisation.
+    Explicit hydrogens are added for conformation generation then removed before return.
+
+    Args:
+        smiles: A valid SMILES string.
+
+    Returns:
+        An SDF MolBlock string (contains ``$$$$`` terminator) or ``None`` if the
+        molecule is invalid or 3D embedding fails.
+    """
+    if not smiles:
+        return None
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        mol = Chem.AddHs(mol)
+        params = AllChem.ETKDGv3()
+        params.randomSeed = 42
+        result = AllChem.EmbedMolecule(mol, params)
+        if result != 0:
+            logger.debug("3D embedding failed for SMILES: %s", smiles)
+            return None
+        AllChem.MMFFOptimizeMolecule(mol, maxIters=200)
+        mol = Chem.RemoveHs(mol)
+        block = Chem.MolToMolBlock(mol)
+        if not block.strip().endswith("$$$$"):
+            block = block.rstrip() + "\n$$$$\n"
+        return block
+    except Exception as exc:
+        logger.debug("mol_to_3d_sdf failed for %s: %s", smiles, exc)
+        return None
