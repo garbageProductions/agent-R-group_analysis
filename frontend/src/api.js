@@ -38,7 +38,7 @@ export async function uploadFile(file) {
 export const getSession = (sessionId) => request(`/upload/session/${sessionId}`)
 
 // ── Analysis ──────────────────────────────────────────────────
-export function startAnalysis({ sessionId, propertyOfInterest, coreSmarts, runEnumeration, similarityThreshold, activityDiffThreshold }) {
+export function startAnalysis({ sessionId, propertyOfInterest, coreSmarts, runEnumeration, similarityThreshold, activityDiffThreshold, runGenerative, generativeConfig }) {
   return request('/analyze/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -49,6 +49,8 @@ export function startAnalysis({ sessionId, propertyOfInterest, coreSmarts, runEn
       run_enumeration: runEnumeration,
       similarity_threshold: similarityThreshold,
       activity_diff_threshold: activityDiffThreshold,
+      run_generative: runGenerative || false,
+      generative_config: generativeConfig || null,
     }),
   })
 }

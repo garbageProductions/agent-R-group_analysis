@@ -25,6 +25,11 @@ export default function App() {
     runEnumeration: false,
     similarityThreshold: 0.7,
     activityDiffThreshold: 1.0,
+    // Generative design
+    runGenerative: false,
+    generativeScoringMode: 'both',
+    generativeIterations: 5,
+    generativeSteps: 500,
   })
 
   // Persist pipeline session across page refreshes
