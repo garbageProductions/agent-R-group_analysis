@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 # Ensure backend package is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from backend.api.routes import upload, analyze, results, chat
+from backend.api.routes import upload, analyze, results, chat, reports
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +54,7 @@ app.include_router(upload.router, prefix="/api")
 app.include_router(analyze.router, prefix="/api")
 app.include_router(results.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 
 
 @app.get("/api/health")

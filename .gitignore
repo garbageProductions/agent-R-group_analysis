@@ -46,3 +46,6 @@ logs/
 *.bak
 *.tmp
 .cache/
+
+# ── Pipeline reports (saved locally, never committed) ────────────────────────
+data/reports/
