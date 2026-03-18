@@ -219,3 +219,110 @@ def parse_upload(content: str, filename: str) -> ParsedDataset:
             return _parse_csv(content)
         else:
             return _parse_smiles(content)
+
+
+def parse_activity_csv(
+    content: str,
+    existing_labels: List[str],
+) -> "tuple[List[str], Dict[str, List[Any]]]":
+    """
+    Parse a CSV of activity/property data and align it to existing session molecules.
+
+    The CSV must have at least one numeric column (treated as a property) and
+    one non-numeric column (treated as the molecule label/ID).
+
+    Label matching: exact match first, then case-insensitive. Molecules in
+    ``existing_labels`` that have no match in the CSV get ``None`` for every
+    new property column.
+
+    Args:
+        content: Raw CSV text.
+        existing_labels: Ordered list of molecule labels from the active session.
+
+    Returns:
+        ``(property_columns, properties)`` where ``properties`` is a
+        column-keyed ``Dict[str, List[Any]]`` with one entry per column and
+        values indexed by position in ``existing_labels``.
+
+    Raises:
+        ValueError: if the CSV is empty or contains no numeric columns.
+    """
+    reader = csv.DictReader(io.StringIO(content))
+    rows = list(reader)
+    if not rows:
+        raise ValueError("Activity CSV is empty")
+
+    headers = list(rows[0].keys())
+
+    # ── Detect label column ───────────────────────────────────────────────────
+    label_col: Optional[str] = None
+    for candidate in ["id", "ID", "name", "Name", "compound_id", "mol_id", "label", "smiles", "SMILES"]:
+        if candidate in headers:
+            label_col = candidate
+            break
+
+    if label_col is None:
+        # Fall back to first column whose values are non-numeric
+        for h in headers:
+            for row in rows:
+                val = row.get(h, "").strip()
+                if val:
+                    try:
+                        float(val)
+                    except ValueError:
+                        label_col = h
+                    break
+            if label_col:
+                break
+
+    # ── Detect numeric (property) columns ────────────────────────────────────
+    prop_cols: List[str] = []
+    for h in headers:
+        if h == label_col:
+            continue
+        # A column is considered numeric if ANY of its values can be parsed as float
+        has_numeric = False
+        for row in rows:
+            val = row.get(h, "").strip()
+            if val:
+                try:
+                    float(val)
+                    has_numeric = True
+                    break
+                except ValueError:
+                    pass
+        if has_numeric:
+            prop_cols.append(h)
+
+    if not prop_cols:
+        raise ValueError(
+            f"No numeric property columns found in activity CSV. "
+            f"Headers: {headers}. "
+            f"Detected label column: {label_col!r}."
+        )
+
+    # ── Build label → values lookup from CSV ─────────────────────────────────
+    csv_data: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        lbl = row.get(label_col, "").strip() if label_col else None
+        if not lbl:
+            continue
+        entry: Dict[str, Any] = {}
+        for col in prop_cols:
+            val_str = row.get(col, "").strip()
+            try:
+                entry[col] = float(val_str)
+            except (ValueError, TypeError):
+                entry[col] = None
+        csv_data[lbl] = entry
+
+    csv_lower: Dict[str, Dict[str, Any]] = {k.lower(): v for k, v in csv_data.items()}
+
+    # ── Align to existing_labels ──────────────────────────────────────────────
+    properties: Dict[str, List[Any]] = {col: [] for col in prop_cols}
+    for label in existing_labels:
+        matched = csv_data.get(label) or csv_lower.get(label.lower())
+        for col in prop_cols:
+            properties[col].append(matched[col] if matched and col in matched else None)
+
+    return prop_cols, properties
