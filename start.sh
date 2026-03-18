@@ -6,6 +6,24 @@
 #    ./start.sh --prod    — production mode (serve pre-built frontend)
 #    ./start.sh --backend — backend only (API on port 8000)
 # =============================================================================
+
+# ── WSL auto-relay ────────────────────────────────────────────────────────────
+# If running under Git Bash / MSYS2 on Windows, re-execute inside WSL.
+if [[ "${OSTYPE:-}" == msys* || "${MSYSTEM:-}" == MINGW* || \
+      "$(uname -s 2>/dev/null)" == MINGW* ]]; then
+  if ! command -v wsl &>/dev/null; then
+    echo "ERROR: WSL is not installed. Install it with: wsl --install"
+    exit 1
+  fi
+  SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  if [[ "$SCRIPT_PATH" =~ ^//wsl[.$] ]]; then
+    WSL_SCRIPT="$(echo "$SCRIPT_PATH" | sed 's|^//wsl[^/]*/[^/]*||')"
+  else
+    WSL_SCRIPT="$(wsl wslpath -u "$(cygpath -w "$SCRIPT_PATH")" 2>/dev/null || echo "$SCRIPT_PATH")"
+  fi
+  exec wsl bash "$WSL_SCRIPT" "$@"
+fi
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -138,13 +156,27 @@ BACKEND_PID=$!
 PIDS+=("$BACKEND_PID")
 
 # Wait for backend to be ready (up to 15s)
+# Use /usr/bin/curl explicitly to avoid picking up Windows curl on PATH
+CURL_CMD=""
+if [ -x /usr/bin/curl ]; then
+  CURL_CMD="/usr/bin/curl"
+elif command -v curl &>/dev/null && curl --version 2>&1 | grep -q "linux"; then
+  CURL_CMD="curl"
+fi
+
 info "Waiting for backend to be ready…"
 READY=false
 for i in $(seq 1 30); do
   sleep 0.5
-  if curl -sf http://localhost:8000/api/health &>/dev/null; then
-    READY=true
-    break
+  if [ -n "$CURL_CMD" ]; then
+    if $CURL_CMD -sf http://localhost:8000/api/health &>/dev/null; then
+      READY=true; break
+    fi
+  else
+    # fallback: use python to check
+    if "$PYTHON" -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" &>/dev/null 2>&1; then
+      READY=true; break
+    fi
   fi
 done
 
@@ -183,6 +215,11 @@ echo -e "  ${BOLD}Backend API${RESET}  ${CYAN}http://localhost:8000${RESET}"
 echo -e "  ${BOLD}API Docs${RESET}     ${CYAN}http://localhost:8000/api/docs${RESET}"
 if [ "$MODE" = "prod" ]; then
   echo -e "  ${BOLD}App (prod)${RESET}   ${CYAN}http://localhost:8000${RESET}"
+fi
+echo ""
+# WSL: localhost forwarding works automatically on Windows 11 / WSL2
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  echo -e "  ${CYAN}Running inside WSL — open the URLs above in your Windows browser${RESET}"
 fi
 echo ""
 echo -e "  ${YELLOW}Press Ctrl+C to stop all services${RESET}"

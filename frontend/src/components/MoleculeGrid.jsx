@@ -32,9 +32,9 @@ export default function MoleculeGrid({ sessionId, smiles = [], labels = [] }) {
                 <button key={idx} className="btn" onClick={() => setPage(idx)}
                   style={{
                     padding: '5px 9px',
-                    background: idx === page ? 'var(--blue)' : 'transparent',
-                    border: `1px solid ${idx === page ? 'var(--blue)' : 'var(--border-dim)'}`,
-                    color: idx === page ? '#fff' : 'var(--text-muted)',
+                    background: idx === page ? 'var(--nanome-cyan)' : 'transparent',
+                    border: `1px solid ${idx === page ? 'var(--nanome-cyan)' : 'var(--border-dim)'}`,
+                    color: idx === page ? '#000' : 'var(--text-muted)',
                     fontSize: '0.72rem',
                   }}>
                   {idx + 1}
@@ -70,7 +70,15 @@ export default function MoleculeGrid({ sessionId, smiles = [], labels = [] }) {
 
       {/* Selected detail */}
       {selected !== null && (
-        <div className="card" style={{ marginTop: 16, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--nanome-cyan)' }}>⬡</span>
+            <span className="panel-header-title">{labels[selected] || `Mol_${selected}`}</span>
+            <span className="badge badge-cyan" style={{ fontSize: '0.6rem' }}>
+              idx {selected}
+            </span>
+          </div>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', padding: 12 }}>
           <div style={{ width: 220, flexShrink: 0 }}>
             <MoleculeCard
               sessionId={sessionId}
@@ -80,8 +88,7 @@ export default function MoleculeGrid({ sessionId, smiles = [], labels = [] }) {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ marginBottom: 10 }}>{labels[selected] || `Mol_${selected}`}</h3>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>SMILES</div>
+            <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>SMILES</div>
             <code style={{
               fontFamily: 'var(--font-mono)', fontSize: '0.78rem',
               color: 'var(--text-code)', wordBreak: 'break-all',
@@ -93,12 +100,8 @@ export default function MoleculeGrid({ sessionId, smiles = [], labels = [] }) {
             }}>
               {smiles[selected]}
             </code>
-            <div style={{ marginTop: 10 }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Index: {selected}
-              </span>
-            </div>
           </div>
+        </div>
         </div>
       )}
     </div>

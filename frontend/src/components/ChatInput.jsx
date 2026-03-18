@@ -73,8 +73,8 @@ export default function ChatInput({ onSend, onFileUpload, disabled, uploadedFile
           display: 'flex', alignItems: 'flex-end', gap: 8,
           padding: '8px 10px 8px 14px',
           borderRadius: 'var(--radius)',
-          background: dragging ? 'rgba(59,130,246,0.07)' : 'var(--bg-card)',
-          border: `1px solid ${dragging ? 'var(--blue)' : 'var(--border-subtle)'}`,
+          background: dragging ? 'rgba(0,196,212,0.07)' : 'var(--bg-card)',
+          border: `1px solid ${dragging ? 'var(--nanome-cyan)' : 'var(--border-subtle)'}`,
           transition: 'border-color 0.15s, background 0.15s',
         }}
       >
@@ -92,7 +92,7 @@ export default function ChatInput({ onSend, onFileUpload, disabled, uploadedFile
             flexShrink: 0,
             alignSelf: 'flex-end', marginBottom: 2,
           }}
-          onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = 'var(--blue)' }}
+          onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = 'var(--nanome-cyan)' }}
           onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
         >
           📎
@@ -138,9 +138,9 @@ export default function ChatInput({ onSend, onFileUpload, disabled, uploadedFile
           onClick={handleSend}
           disabled={disabled || !text.trim()}
           style={{
-            background: (disabled || !text.trim()) ? 'var(--border-subtle)' : 'var(--blue)',
+            background: (disabled || !text.trim()) ? 'var(--border-subtle)' : 'var(--nanome-cyan)',
             border: 'none', borderRadius: 8,
-            color: (disabled || !text.trim()) ? 'var(--text-muted)' : '#fff',
+            color: (disabled || !text.trim()) ? 'var(--text-muted)' : '#000',
             cursor: (disabled || !text.trim()) ? 'default' : 'pointer',
             padding: '6px 14px',
             fontFamily: 'var(--font-display)', fontSize: '0.7rem',

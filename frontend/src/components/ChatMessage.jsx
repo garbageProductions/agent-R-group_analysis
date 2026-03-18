@@ -49,9 +49,9 @@ export default function ChatMessage({ msg }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '0.7rem', fontWeight: 700,
         fontFamily: 'var(--font-display)',
-        background: isUser ? 'var(--bg-surface)' : 'rgba(59,130,246,0.15)',
-        border: `1px solid ${isUser ? 'var(--border-subtle)' : 'var(--blue)33'}`,
-        color: isUser ? 'var(--text-muted)' : 'var(--blue)',
+        background: isUser ? 'var(--bg-surface)' : 'rgba(0,196,212,0.12)',
+        border: `1px solid ${isUser ? 'var(--border-subtle)' : 'rgba(0,196,212,0.3)'}`,
+        color: isUser ? 'var(--text-muted)' : 'var(--nanome-cyan)',
       }}>
         {isUser ? 'You' : 'RG'}
       </div>

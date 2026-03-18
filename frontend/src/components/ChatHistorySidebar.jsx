@@ -33,9 +33,9 @@ function ChatItem({ chat, isActive, onSelect, onTogglePin, onDelete, onRename })
       style={{
         padding: '8px 10px 8px 14px',
         cursor: editing ? 'default' : 'pointer',
-        borderLeft: isActive ? '2px solid var(--blue)' : '2px solid transparent',
+        borderLeft: isActive ? '2px solid var(--nanome-cyan)' : '2px solid transparent',
         background: isActive
-          ? 'rgba(59,130,246,0.09)'
+          ? 'rgba(0,196,212,0.07)'
           : hovered ? 'rgba(255,255,255,0.03)' : 'transparent',
         transition: 'background 0.1s',
         userSelect: 'none',
@@ -58,7 +58,7 @@ function ChatItem({ chat, isActive, onSelect, onTogglePin, onDelete, onRename })
             style={{
               flex: 1,
               background: 'var(--bg-card)',
-              border: '1px solid var(--blue)66',
+              border: '1px solid rgba(0,196,212,0.4)',
               borderRadius: 3,
               padding: '2px 6px',
               color: 'var(--text-primary)',
@@ -274,10 +274,10 @@ export default function ChatHistorySidebar({
           style={{
             width:       '100%',
             background:  'transparent',
-            border:      '1px solid var(--blue)',
+            border:      '1px solid var(--nanome-cyan)',
             borderRadius: 'var(--radius-sm, 6px)',
             padding:     '8px 12px',
-            color:        'var(--blue)',
+            color:        'var(--nanome-cyan)',
             fontFamily:  'var(--font-display)',
             fontSize:    '0.7rem',
             fontWeight:  700,
@@ -290,7 +290,7 @@ export default function ChatHistorySidebar({
             justifyContent: 'center',
             gap: 6,
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,196,212,0.1)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           + New Chat
@@ -316,7 +316,7 @@ export default function ChatHistorySidebar({
             fontSize:    '0.68rem',
             outline:     'none',
           }}
-          onFocus={e => e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'}
+          onFocus={e => e.currentTarget.style.borderColor = 'rgba(0,196,212,0.4)'}
           onBlur={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
         />
       </div>
@@ -329,11 +329,11 @@ export default function ChatHistorySidebar({
             onClick={() => setSort(s)}
             style={{
               flex:          1,
-              background:    sort === s ? 'rgba(59,130,246,0.15)' : 'transparent',
-              border:        sort === s ? '1px solid rgba(59,130,246,0.35)' : '1px solid var(--border-subtle)',
+              background:    sort === s ? 'rgba(0,196,212,0.1)' : 'transparent',
+              border:        sort === s ? '1px solid rgba(0,196,212,0.3)' : '1px solid var(--border-subtle)',
               borderRadius:  'var(--radius-sm, 6px)',
               padding:       '4px 4px',
-              color:         sort === s ? 'var(--blue)' : 'var(--text-muted)',
+              color:         sort === s ? 'var(--nanome-cyan)' : 'var(--text-muted)',
               fontFamily:    'var(--font-display)',
               fontSize:      '0.56rem',
               fontWeight:    600,

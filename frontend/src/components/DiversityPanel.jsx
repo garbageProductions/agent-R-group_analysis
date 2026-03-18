@@ -95,28 +95,33 @@ export default function DiversityPanel({ diversityData, sessionId, allSmiles = [
           </div>
 
           {/* Diversity meter */}
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="card-title" style={{ marginBottom: 10 }}>Diversity Meter</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 8, background: 'var(--border-dim)', borderRadius: 4 }}>
-                <div style={{
-                  width: `${(diversity_score || 0) * 100}%`,
-                  height: '100%',
-                  background: diversity_score > 0.6 ? 'var(--green)' :
-                    diversity_score > 0.3 ? 'var(--amber)' : 'var(--red)',
-                  borderRadius: 4,
-                  transition: 'width 0.8s ease',
-                }} />
-              </div>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem',
-                color: 'var(--text-primary)', width: 40, textAlign: 'right' }}>
-                {diversity_score?.toFixed(2)}
-              </span>
+          <div className="panel" style={{ marginTop: 14 }}>
+            <div className="panel-header">
+              <span style={{ fontSize: '0.8rem', color: 'var(--nanome-cyan)' }}>⦿</span>
+              <span className="panel-header-title">Diversity Meter</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between',
-              fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              <span>Homogeneous (0)</span>
-              <span>Maximally diverse (1)</span>
+            <div className="panel-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, height: 6, background: 'var(--border-dim)', borderRadius: 4 }}>
+                  <div style={{
+                    width: `${(diversity_score || 0) * 100}%`,
+                    height: '100%',
+                    background: diversity_score > 0.6 ? 'var(--green)' :
+                      diversity_score > 0.3 ? 'var(--amber)' : 'var(--red)',
+                    borderRadius: 4,
+                    transition: 'width 0.8s ease',
+                  }} />
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem',
+                  color: 'var(--text-primary)', width: 40, textAlign: 'right' }}>
+                  {diversity_score?.toFixed(2)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between',
+                fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                <span>Homogeneous (0)</span>
+                <span>Maximally diverse (1)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -168,28 +173,34 @@ export default function DiversityPanel({ diversityData, sessionId, allSmiles = [
               .sort((a, b) => b[1].length - a[1].length)
               .slice(0, 6)
               .map(([leader, members], i) => (
-                <div key={leader} className="card" style={{ padding: '10px 12px' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem',
-                    color: 'var(--text-muted)', marginBottom: 5 }}>
-                    Cluster {i + 1}  ·  {members.length} member{members.length !== 1 ? 's' : ''}
+                <div key={leader} className="panel">
+                  <div className="panel-header">
+                    <span style={{ fontSize: '0.62rem', color: COLORS[i % COLORS.length],
+                      fontFamily: 'var(--font-display)', fontWeight: 700 }}>
+                      C{i + 1}
+                    </span>
+                    <span className="panel-header-title" style={{ fontSize: '0.72rem', color: COLORS[i % COLORS.length] }}>
+                      {leader}
+                    </span>
+                    <span className="badge badge-blue" style={{ fontSize: '0.58rem' }}>
+                      {members.length}
+                    </span>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.78rem',
-                    fontWeight: 600, color: COLORS[i % COLORS.length], marginBottom: 6 }}>
-                    Leader: {leader}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {members.slice(0, 5).map(m => (
-                      <span key={m} style={{ fontSize: '0.65rem', color: 'var(--text-muted)',
-                        background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
-                        borderRadius: 3, padding: '1px 5px' }}>
-                        {m}
-                      </span>
-                    ))}
-                    {members.length > 5 && (
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                        +{members.length - 5} more
-                      </span>
-                    )}
+                  <div className="panel-body" style={{ padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {members.slice(0, 5).map(m => (
+                        <span key={m} style={{ fontSize: '0.65rem', color: 'var(--text-muted)',
+                          background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
+                          borderRadius: 3, padding: '1px 5px' }}>
+                          {m}
+                        </span>
+                      ))}
+                      {members.length > 5 && (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          +{members.length - 5} more
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

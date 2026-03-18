@@ -4,6 +4,27 @@
 #  Run once before first use, or re-run to update dependencies.
 #  Safe to run multiple times (idempotent).
 # =============================================================================
+
+# ── WSL auto-relay ────────────────────────────────────────────────────────────
+# If running under Git Bash / MSYS2 on Windows, re-execute inside WSL.
+if [[ "${OSTYPE:-}" == msys* || "${MSYSTEM:-}" == MINGW* || \
+      "$(uname -s 2>/dev/null)" == MINGW* ]]; then
+  if ! command -v wsl &>/dev/null; then
+    echo "ERROR: WSL is not installed. Install it with: wsl --install"
+    exit 1
+  fi
+  # Convert the script path to a WSL Linux path.
+  # Handles both //wsl.localhost/Distro/path and regular Windows C:/... paths.
+  SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  if [[ "$SCRIPT_PATH" =~ ^//wsl[.$] ]]; then
+    # Strip the //wsl.localhost/Distro or //wsl$/Distro prefix
+    WSL_SCRIPT="$(echo "$SCRIPT_PATH" | sed 's|^//wsl[^/]*/[^/]*||')"
+  else
+    WSL_SCRIPT="$(wsl wslpath -u "$(cygpath -w "$SCRIPT_PATH")" 2>/dev/null || echo "$SCRIPT_PATH")"
+  fi
+  exec wsl bash "$WSL_SCRIPT" "$@"
+fi
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -67,28 +88,41 @@ if [ -z "$PYTHON" ]; then
   err "Python 3.9+ is required but was not found."
   echo ""
   echo "  Install options:"
-  echo "    macOS:    brew install python@3.11"
-  echo "    Ubuntu:   sudo apt install python3.11 python3.11-venv"
-  echo "    Conda:    conda create -n rganalysis python=3.11 && conda activate rganalysis"
+  echo "    Ubuntu/WSL: sudo apt update && sudo apt install python3.11 python3.11-venv"
+  echo "    macOS:      brew install python@3.11"
+  echo "    Conda:      conda create -n rganalysis python=3.11 && conda activate rganalysis"
   exit 1
 fi
 ok "Python: $($PYTHON --version)"
 
 # pip
 if ! "$PYTHON" -m pip --version &>/dev/null; then
-  err "pip not found for $PYTHON. Install with: $PYTHON -m ensurepip"
+  err "pip not found for $PYTHON."
+  echo ""
+  echo "  Install options:"
+  echo "    Ubuntu/WSL: sudo apt install python3-pip"
+  echo "    or:         $PYTHON -m ensurepip --upgrade"
   exit 1
 fi
 ok "pip: $($PYTHON -m pip --version | awk '{print $1,$2}')"
+
+# python3-venv check (required for virtualenv creation on Ubuntu/Debian)
+if ! "$PYTHON" -c "import venv" &>/dev/null; then
+  PY_VER=$("$PYTHON" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+  err "python3-venv is not installed for Python ${PY_VER}."
+  echo ""
+  echo "  Fix:  sudo apt install python${PY_VER}-venv"
+  exit 1
+fi
 
 # Node.js 18+
 if ! command -v node &>/dev/null; then
   err "Node.js 18+ is required but was not found."
   echo ""
   echo "  Install options:"
-  echo "    macOS:  brew install node"
-  echo "    Ubuntu: sudo apt install nodejs npm  (or use nvm)"
-  echo "    nvm:    nvm install 20 && nvm use 20"
+  echo "    Ubuntu/WSL: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install nodejs"
+  echo "    nvm:        nvm install 22 && nvm use 22"
+  echo "    macOS:      brew install node"
   exit 1
 fi
 
@@ -145,9 +179,13 @@ if ! pip install -r "$ROOT/backend/requirements.txt"; then
   echo "      conda create -n rganalysis python=3.11"
   echo "      conda activate rganalysis"
   echo "      conda install -c conda-forge rdkit"
-  echo "      pip install -r backend/requirements.txt  (rdkit already installed)"
+  echo "      pip install -r backend/requirements.txt"
   echo ""
-  echo "    Option B — macOS with homebrew rdkit:"
+  echo "    Option B — Ubuntu/WSL apt:"
+  echo "      sudo apt install python3-rdkit"
+  echo "      pip install -r backend/requirements.txt  (skip rdkit line)"
+  echo ""
+  echo "    Option C — macOS with homebrew:"
   echo "      brew install rdkit"
   echo "      pip install -r backend/requirements.txt"
   echo ""

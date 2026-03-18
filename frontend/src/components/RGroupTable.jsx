@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { getRGroupTable } from '../api.js'
+import DotMenu from './DotMenu.jsx'
 
 function truncate(s, n = 30) { return s && s.length > n ? s.slice(0, n) + '…' : s }
 
 export default function RGroupTable({ sessionId }) {
-  const [data, setData]   = useState(null)
-  const [error, setError] = useState(null)
-  const [selPos, setSelPos] = useState(null) // selected R-group position for frequency chart
+  const [data, setData]     = useState(null)
+  const [error, setError]   = useState(null)
+  const [selPos, setSelPos] = useState(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     if (!sessionId) return
@@ -17,17 +19,23 @@ export default function RGroupTable({ sessionId }) {
   }, [sessionId])
 
   if (error) return <div className="empty-state">⚠ {error}</div>
-  if (!data) return <div className="empty-state">
-    <div style={{ width: 24, height: 24, border: '2px solid var(--border-subtle)',
-      borderTopColor: 'var(--blue)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-    Loading R-group table…
-  </div>
-
+  if (!data) return (
+    <div className="empty-state">
+      <div style={{ width: 24, height: 24, border: '2px solid var(--border-subtle)',
+        borderTopColor: 'var(--nanome-cyan)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+      Loading R-group table…
+    </div>
+  )
   if (!data.rows?.length) return <div className="empty-state">No R-group decomposition data available</div>
 
   const rCols = (data.columns || []).filter(c => c !== 'Core')
 
-  // Frequency chart data for selected position
+  const filteredRows = search
+    ? data.rows.filter(row =>
+        Object.values(row).some(v => String(v).toLowerCase().includes(search.toLowerCase()))
+      )
+    : data.rows
+
   const freqData = selPos && data.rgroup_frequency?.[selPos]
     ? Object.entries(data.rgroup_frequency[selPos])
         .sort((a, b) => b[1] - a[1])
@@ -37,36 +45,67 @@ export default function RGroupTable({ sessionId }) {
 
   return (
     <div>
-      {/* Core display */}
+      {/* Core SMARTS panel */}
       {data.core_smarts && (
-        <div className="card" style={{ marginBottom: 16, padding: '12px 16px' }}>
-          <div className="card-title">Common Core</div>
-          <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-code)' }}>
-            {data.core_smarts}
-          </code>
-          {data.success_rate != null && (
-            <div style={{ marginTop: 8, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-              Coverage: <span style={{ color: 'var(--teal-l)' }}>{(data.success_rate * 100).toFixed(1)}%</span>
-              &nbsp;of molecules matched
-            </div>
-          )}
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--nanome-cyan)' }}>◎</span>
+            <span className="panel-header-title">Common Core</span>
+            {data.success_rate != null && (
+              <span className="panel-header-actions">
+                <span className="badge badge-cyan">
+                  {(data.success_rate * 100).toFixed(1)}% coverage
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="panel-body">
+            <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text-code)' }}>
+              {data.core_smarts}
+            </code>
+          </div>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, alignItems: 'start' }}>
+
         {/* Decomposition table */}
-        <div>
-          <div className="section-title" style={{ marginBottom: 8 }}>Decomposition Table</div>
-          <div className="data-table-wrap" style={{ maxHeight: 460 }}>
+        <div className="panel">
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--blue-l)' }}>⊕</span>
+            <span className="panel-header-title">Decomposition Table</span>
+            <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginLeft: 6 }}>
+              {filteredRows.length} / {data.rows.length} rows
+            </span>
+            <div className="panel-header-actions">
+              {/* Search */}
+              <div className="search-input-wrap" style={{ width: 160 }}>
+                <span className="search-icon">🔍</span>
+                <input className="input" type="text" placeholder="Filter rows…"
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  style={{ fontSize: '0.76rem', padding: '4px 6px 4px 26px', height: 26 }} />
+              </div>
+              <DotMenu items={[
+                { icon: '⬇', label: 'Export CSV',        action: () => {} },
+                { icon: '⧉', label: 'Copy to clipboard', action: () => {} },
+                { divider: true },
+                { icon: '↺', label: 'Reload data',       action: () => {} },
+              ]} />
+            </div>
+          </div>
+          <div className="data-table-wrap" style={{ border: 'none', borderRadius: 0, maxHeight: 420 }}>
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Label</th>
-                  {data.columns?.map(col => <th key={col}>{col}</th>)}
+                  {data.columns?.map(col => (
+                    <th key={col} className="sortable">{col}</th>
+                  ))}
+                  <th className="th-actions" style={{ width: 36 }} />
                 </tr>
               </thead>
               <tbody>
-                {data.rows.map((row, i) => (
+                {filteredRows.map((row, i) => (
                   <tr key={i}>
                     <td style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
                       {row.label || row.index}
@@ -81,16 +120,29 @@ export default function RGroupTable({ sessionId }) {
                       return (
                         <td key={col} className="mono"
                           style={{
-                            background: isCommon && col !== 'Core' ? 'rgba(20,184,166,0.06)' : 'transparent',
+                            background: isCommon && col !== 'Core' ? 'rgba(0,196,212,0.06)' : 'transparent',
                             color: col === 'Core' ? 'var(--text-secondary)' : 'var(--text-code)',
                           }}>
                           <div className="tooltip-wrap">
                             {truncate(val, 28)}
-                            {val.length > 28 && <div className="tooltip" style={{ whiteSpace: 'normal', width: 280 }}>{val}</div>}
+                            {val.length > 28 && (
+                              <div className="tooltip" style={{ whiteSpace: 'normal', width: 280 }}>{val}</div>
+                            )}
                           </div>
                         </td>
                       )
                     })}
+                    <td className="actions">
+                      <div className="row-actions">
+                        <DotMenu direction="down" align="right" items={[
+                          { icon: '⊕', label: 'Zoom to',        action: () => {} },
+                          { icon: '⧉', label: 'Copy SMILES',    action: () => {} },
+                          { icon: '🏷', label: 'Add annotation', action: () => {} },
+                          { divider: true },
+                          { icon: '⚡', label: 'Find cliffs',    action: () => {} },
+                        ]} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -98,50 +150,49 @@ export default function RGroupTable({ sessionId }) {
           </div>
         </div>
 
-        {/* Frequency chart */}
-        <div>
-          <div className="section-title" style={{ marginBottom: 8 }}>Substituent Frequency</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {rCols.map(col => (
-              <button key={col}
-                className={`btn ${selPos === col ? 'btn-teal' : 'btn-ghost'}`}
-                style={{ padding: '4px 10px', fontSize: '0.7rem' }}
-                onClick={() => setSelPos(col)}>
-                {col}
-              </button>
-            ))}
+        {/* Frequency chart panel */}
+        <div className="panel">
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--teal-l)' }}>◐</span>
+            <span className="panel-header-title">Substituent Frequency</span>
           </div>
+          <div className="panel-body">
+            {/* Position pills */}
+            <div className="pill-tabs" style={{ marginBottom: 12 }}>
+              {rCols.map(col => (
+                <button key={col}
+                  className={`pill-tab ${selPos === col ? 'active' : ''}`}
+                  onClick={() => setSelPos(col)}>
+                  {col}
+                </button>
+              ))}
+            </div>
 
-          {freqData.length > 0 ? (
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius)',
-              padding: '12px 8px 4px',
-            }}>
-              <ResponsiveContainer width="100%" height={Math.max(160, freqData.length * 28)}>
-                <BarChart data={freqData} layout="vertical" margin={{ left: 8, right: 16, top: 0, bottom: 0 }}>
+            {freqData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(140, freqData.length * 28)}>
+                <BarChart data={freqData} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
                   <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
                   <YAxis type="category" dataKey="name" width={100}
                     tick={{ fill: 'var(--text-code)', fontSize: 10, fontFamily: 'JetBrains Mono' }} />
                   <Tooltip
-                    contentStyle={{ background: 'var(--bg-card-hi)', border: '1px solid var(--border-default)',
-                      borderRadius: 4, fontSize: 11 }}
-                    cursor={{ fill: 'rgba(59,130,246,0.05)' }}
-                    formatter={(v, n, p) => [v, 'Count']}
+                    contentStyle={{ background: 'var(--bg-popup)', border: '1px solid var(--border-default)',
+                      borderRadius: 6, fontSize: 11 }}
+                    cursor={{ fill: 'rgba(0,196,212,0.05)' }}
+                    formatter={(v) => [v, 'Count']}
                     labelFormatter={(l, payload) => payload?.[0]?.payload?.smiles || l}
                   />
-                  <Bar dataKey="count" radius={[0,2,2,0]}>
+                  <Bar dataKey="count" radius={[0, 3, 3, 0]}>
                     {freqData.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? 'var(--teal)' : i === freqData.length - 1 ? 'var(--blue)' : 'var(--blue-l)'} />
+                      <Cell key={i}
+                        fill={i === 0 ? 'var(--nanome-cyan)' : `rgba(0,196,212,${0.7 - i * 0.04})`} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="empty-state" style={{ padding: 24 }}>Select a position</div>
-          )}
+            ) : (
+              <div className="empty-state" style={{ padding: 24 }}>Select a position</div>
+            )}
+          </div>
         </div>
       </div>
     </div>

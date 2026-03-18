@@ -152,7 +152,7 @@ export default function ProgressPanel({ sessionId, onComplete, onError }) {
           )
         })}
         {status === 'running' && messages.length > 0 && (
-          <span style={{ color: 'var(--blue-l)', animation: 'pulse-dot 0.8s infinite' }}>▋</span>
+          <span style={{ color: 'var(--nanome-cyan-l)', animation: 'pulse-dot 0.8s infinite' }}>▋</span>
         )}
       </div>
 
@@ -160,7 +160,7 @@ export default function ProgressPanel({ sessionId, onComplete, onError }) {
       <div style={{ height: 2, background: 'var(--border-dim)' }}>
         <div style={{
           height: '100%',
-          background: 'linear-gradient(90deg, var(--blue), var(--teal))',
+          background: 'linear-gradient(90deg, var(--nanome-cyan), var(--blue))',
           width: status === 'complete' ? '100%' : `${Math.min(100, (messages.length / 12) * 100)}%`,
           transition: 'width 0.5s ease',
         }} />

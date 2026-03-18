@@ -134,30 +134,31 @@ export default function ScaffoldTree({ scaffoldData }) {
 
       {/* LLM interpretation */}
       {scaffoldData?.llm_interpretation && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
-          <div className="card-title" style={{ marginBottom: 8 }}>Scaffold Interpretation</div>
-          <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {scaffoldData.llm_interpretation}
-          </p>
-          {scaffoldData.dataset_type && (
-            <div style={{ marginTop: 8 }}>
+        <div className="panel" style={{ marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--green)' }}>⎇</span>
+            <span className="panel-header-title">Scaffold Interpretation</span>
+            {scaffoldData.dataset_type && (
               <span className={`badge ${scaffoldData.dataset_type === 'diverse' ? 'badge-teal' :
                 scaffoldData.dataset_type === 'focused' ? 'badge-blue' : 'badge-amber'}`}>
                 {scaffoldData.dataset_type}
               </span>
-            </div>
-          )}
+            )}
+          </div>
+          <div className="panel-body">
+            <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {scaffoldData.llm_interpretation}
+            </p>
+          </div>
         </div>
       )}
 
       {/* View toggle */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <button className={`btn ${view === 'list' ? 'btn-teal' : 'btn-ghost'}`}
-          style={{ padding: '5px 12px', fontSize: '0.72rem' }} onClick={() => setView('list')}>
+      <div className="pill-tabs" style={{ marginBottom: 12, display: 'inline-flex' }}>
+        <button className={`pill-tab ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>
           ☰ Ranked List
         </button>
-        <button className={`btn ${view === 'tree' ? 'btn-teal' : 'btn-ghost'}`}
-          style={{ padding: '5px 12px', fontSize: '0.72rem' }} onClick={() => setView('tree')}>
+        <button className={`pill-tab ${view === 'tree' ? 'active' : ''}`} onClick={() => setView('tree')}>
           ⤵ Hierarchy
         </button>
       </div>

@@ -285,7 +285,7 @@ function AgentRow({ agent }) {
       <div style={{ minWidth: 180, flexShrink: 0 }}>
         <div style={{
           fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700,
-          color: 'var(--blue-l)', letterSpacing: '0.04em',
+          color: 'var(--nanome-cyan-l)', letterSpacing: '0.04em',
         }}>{agent.name}</div>
         <div style={{
           fontFamily: 'var(--font-display)', fontSize: '0.6rem',
@@ -343,13 +343,13 @@ export default function DocsPage() {
             style={{
               display: 'block', width: '100%',
               textAlign: 'left', background: 'none',
-              border: 'none', borderLeft: `2px solid ${activeSection === id ? 'var(--blue)' : 'transparent'}`,
+              border: 'none', borderLeft: `2px solid ${activeSection === id ? 'var(--nanome-cyan)' : 'transparent'}`,
               padding: '8px 18px',
               cursor: 'pointer',
               fontFamily: 'var(--font-display)', fontSize: '0.72rem',
               fontWeight: activeSection === id ? 700 : 400,
               letterSpacing: '0.04em',
-              color: activeSection === id ? 'var(--blue-l)' : 'var(--text-secondary)',
+              color: activeSection === id ? 'var(--nanome-cyan-l)' : 'var(--text-secondary)',
               transition: 'color 0.15s, border-color 0.15s',
             }}
           >
@@ -414,7 +414,7 @@ export default function DocsPage() {
                   }}>
                     <div style={{
                       fontFamily: 'var(--font-display)', fontSize: '0.65rem',
-                      fontWeight: 700, color: 'var(--blue-l)',
+                      fontWeight: 700, color: 'var(--nanome-cyan-l)',
                     }}>{k}</div>
                     <div style={{
                       fontFamily: 'var(--font-body, DM Sans)', fontSize: '0.8rem',
@@ -564,7 +564,7 @@ export default function DocsPage() {
               fontFamily: 'var(--font-body, DM Sans)', fontSize: '0.85rem',
               color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 24,
             }}>
-              <p>Navigate to the <strong style={{ color: 'var(--blue-l)' }}>Chat</strong> tab to access the conversational agent.
+              <p>Navigate to the <strong style={{ color: 'var(--nanome-cyan-l)' }}>Chat</strong> tab to access the conversational agent.
               You can upload a molecule file directly in the chat via the attach button or by dragging a file onto the input box.</p>
               <p>The agent has access to all nine analysis tools and will automatically use the right ones based on your request.
               Tool calls are shown inline in the chat with expandable result data.</p>

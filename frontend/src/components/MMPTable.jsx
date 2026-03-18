@@ -70,29 +70,33 @@ export default function MMPTable({ sessionId, mmpData, propertyNames = [] }) {
       </div>
 
       {mmpData?.llm_insights && typeof mmpData.llm_insights === 'object' && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--purple)' }}>
-          <div className="card-title">MMP Insights</div>
-          {mmpData.llm_insights.sar_trends && (
-            <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
-              {mmpData.llm_insights.sar_trends}
-            </p>
-          )}
-          {mmpData.llm_insights.actionable_recommendation && (
-            <div style={{ padding: '8px 12px', background: 'rgba(167,139,250,0.07)',
-              borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'var(--purple)' }}>
-              💡 {mmpData.llm_insights.actionable_recommendation}
-            </div>
-          )}
+        <div className="panel" style={{ marginBottom: 16, borderLeft: '3px solid var(--purple)' }}>
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--purple)' }}>⇄</span>
+            <span className="panel-header-title">MMP Insights</span>
+          </div>
+          <div className="panel-body">
+            {mmpData.llm_insights.sar_trends && (
+              <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                {mmpData.llm_insights.sar_trends}
+              </p>
+            )}
+            {mmpData.llm_insights.actionable_recommendation && (
+              <div style={{ padding: '8px 12px', background: 'rgba(167,139,250,0.07)',
+                borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'var(--purple)' }}>
+                💡 {mmpData.llm_insights.actionable_recommendation}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Property selector */}
       {allProps.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="pill-tabs" style={{ marginBottom: 12, display: 'inline-flex' }}>
           {allProps.map(p => (
             <button key={p}
-              className={`btn ${selectedProp === p ? 'btn-teal' : 'btn-ghost'}`}
-              style={{ padding: '5px 12px', fontSize: '0.72rem' }}
+              className={`pill-tab ${selectedProp === p ? 'active' : ''}`}
               onClick={() => setSelectedProp(p)}>
               {p}
             </button>
@@ -101,66 +105,75 @@ export default function MMPTable({ sessionId, mmpData, propertyNames = [] }) {
       )}
 
       {/* Transform table */}
-      {loading ? (
-        <div className="empty-state">
-          <div style={{ width: 22, height: 22, border: '2px solid var(--border-subtle)',
-            borderTopColor: 'var(--blue)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+      <div className="panel">
+        <div className="panel-header">
+          <span style={{ fontSize: '0.8rem', color: 'var(--purple)' }}>⇄</span>
+          <span className="panel-header-title">Top Transforms</span>
+          {selectedProp && (
+            <span className="badge badge-cyan" style={{ marginLeft: 4 }}>{selectedProp}</span>
+          )}
         </div>
-      ) : transforms.length === 0 ? (
-        <div className="empty-state">No transforms found for this property</div>
-      ) : (
-        <div className="data-table-wrap" style={{ maxHeight: 480 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>From Fragment</th>
-                <th>→</th>
-                <th>To Fragment</th>
-                <th style={{ textAlign: 'right' }}>Δ {selectedProp || 'Property'}</th>
-                <th style={{ textAlign: 'right' }}>Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transforms.map((t, i) => {
-                const delta = t.mean_delta ?? t.mean_deltas?.[selectedProp]
-                return (
-                  <tr key={i}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{i + 1}</td>
-                    <td>
-                      <div className="tooltip-wrap">
-                        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.73rem',
-                          color: 'var(--text-code)' }}>{truncate(t.from || t.from_frag, 28)}</code>
-                        {(t.from || t.from_frag)?.length > 28 && (
-                          <div className="tooltip" style={{ whiteSpace: 'normal', width: 260 }}>
-                            {t.from || t.from_frag}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>→</td>
-                    <td>
-                      <div className="tooltip-wrap">
-                        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.73rem',
-                          color: 'var(--text-code)' }}>{truncate(t.to || t.to_frag, 28)}</code>
-                        {(t.to || t.to_frag)?.length > 28 && (
-                          <div className="tooltip" style={{ whiteSpace: 'normal', width: 260 }}>
-                            {t.to || t.to_frag}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <DeltaCell value={delta} />
-                    <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>
-                      <span className="badge badge-blue">{t.count}</span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+        {loading ? (
+          <div className="empty-state" style={{ padding: 32 }}>
+            <div style={{ width: 22, height: 22, border: '2px solid var(--border-subtle)',
+              borderTopColor: 'var(--nanome-cyan)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          </div>
+        ) : transforms.length === 0 ? (
+          <div className="empty-state" style={{ padding: 32 }}>No transforms found for this property</div>
+        ) : (
+          <div className="data-table-wrap" style={{ border: 'none', borderRadius: 0, maxHeight: 480 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>From Fragment</th>
+                  <th>→</th>
+                  <th>To Fragment</th>
+                  <th style={{ textAlign: 'right' }}>Δ {selectedProp || 'Property'}</th>
+                  <th style={{ textAlign: 'right' }}>Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transforms.map((t, i) => {
+                  const delta = t.mean_delta ?? t.mean_deltas?.[selectedProp]
+                  return (
+                    <tr key={i}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{i + 1}</td>
+                      <td>
+                        <div className="tooltip-wrap">
+                          <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.73rem',
+                            color: 'var(--text-code)' }}>{truncate(t.from || t.from_frag, 28)}</code>
+                          {(t.from || t.from_frag)?.length > 28 && (
+                            <div className="tooltip" style={{ whiteSpace: 'normal', width: 260 }}>
+                              {t.from || t.from_frag}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>→</td>
+                      <td>
+                        <div className="tooltip-wrap">
+                          <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.73rem',
+                            color: 'var(--text-code)' }}>{truncate(t.to || t.to_frag, 28)}</code>
+                          {(t.to || t.to_frag)?.length > 28 && (
+                            <div className="tooltip" style={{ whiteSpace: 'normal', width: 260 }}>
+                              {t.to || t.to_frag}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <DeltaCell value={delta} />
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>
+                        <span className="badge badge-blue">{t.count}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

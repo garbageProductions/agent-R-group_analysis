@@ -73,43 +73,49 @@ export default function SARChart({ sarData, propertyName }) {
 
       {/* LLM narrative */}
       {sarData.llm_sar_narrative && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--teal)' }}>
-          <div className="card-title">SAR Interpretation</div>
-          <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {sarData.llm_sar_narrative}
-          </p>
-          {sarData.llm_design_hypothesis && (
-            <div style={{ marginTop: 10, padding: '8px 12px',
-              background: 'rgba(20,184,166,0.07)', borderRadius: 'var(--radius-sm)',
-              fontSize: '0.78rem', color: 'var(--teal-l)' }}>
-              💡 {sarData.llm_design_hypothesis}
-            </div>
-          )}
+        <div className="panel" style={{ marginBottom: 16, borderLeft: '3px solid var(--teal)' }}>
+          <div className="panel-header">
+            <span style={{ fontSize: '0.8rem', color: 'var(--teal-l)' }}>◐</span>
+            <span className="panel-header-title">SAR Interpretation</span>
+          </div>
+          <div className="panel-body">
+            <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {sarData.llm_sar_narrative}
+            </p>
+            {sarData.llm_design_hypothesis && (
+              <div style={{ marginTop: 10, padding: '8px 12px',
+                background: 'rgba(20,184,166,0.07)', borderRadius: 'var(--radius-sm)',
+                fontSize: '0.78rem', color: 'var(--teal-l)' }}>
+                💡 {sarData.llm_design_hypothesis}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Position tabs + importance */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        {positions.map(pos => {
-          const imp = importance[pos]
-          return (
-            <button key={pos}
-              className={`btn ${selPos === pos ? 'btn-teal' : 'btn-ghost'}`}
-              style={{ padding: '5px 12px', fontSize: '0.72rem' }}
-              onClick={() => setSelPos(pos)}>
-              {pos}
-              {imp != null && (
-                <span style={{ marginLeft: 4, fontFamily: 'var(--font-mono)',
-                  color: selPos === pos ? 'inherit' : 'var(--text-muted)' }}>
-                  {(imp * 100).toFixed(0)}%
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="pill-tabs" style={{ display: 'inline-flex', flexWrap: 'wrap' }}>
+          {positions.map(pos => {
+            const imp = importance[pos]
+            return (
+              <button key={pos}
+                className={`pill-tab ${selPos === pos ? 'active' : ''}`}
+                onClick={() => setSelPos(pos)}>
+                {pos}
+                {imp != null && (
+                  <span style={{ marginLeft: 4, fontFamily: 'var(--font-mono)', fontSize: '0.68rem',
+                    color: selPos === pos ? 'var(--nanome-cyan)' : 'var(--text-muted)' }}>
+                    {(imp * 100).toFixed(0)}%
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
         {positions.length > 1 && (
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 8 }}>
-            (% = ANOVA importance)
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+            % = ANOVA importance
           </span>
         )}
       </div>
@@ -118,21 +124,31 @@ export default function SARChart({ sarData, propertyName }) {
       {selPos && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           {best[selPos] && (
-            <div className="card" style={{ padding: '8px 12px', borderLeft: '3px solid var(--green)', flex: 1 }}>
-              <div className="card-title" style={{ color: 'var(--green)', marginBottom: 4 }}>Best Substituent</div>
-              <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-code)',
-                wordBreak: 'break-all' }}>
-                {best[selPos]}
-              </code>
+            <div className="panel" style={{ flex: 1, borderLeft: '3px solid var(--green)' }}>
+              <div className="panel-header">
+                <span style={{ color: 'var(--green)', fontSize: '0.8rem' }}>▲</span>
+                <span className="panel-header-title" style={{ color: 'var(--green)' }}>Best Substituent</span>
+              </div>
+              <div className="panel-body">
+                <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-code)',
+                  wordBreak: 'break-all' }}>
+                  {best[selPos]}
+                </code>
+              </div>
             </div>
           )}
           {worst[selPos] && (
-            <div className="card" style={{ padding: '8px 12px', borderLeft: '3px solid var(--red)', flex: 1 }}>
-              <div className="card-title" style={{ color: 'var(--red)', marginBottom: 4 }}>Worst Substituent</div>
-              <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-code)',
-                wordBreak: 'break-all' }}>
-                {worst[selPos]}
-              </code>
+            <div className="panel" style={{ flex: 1, borderLeft: '3px solid var(--red)' }}>
+              <div className="panel-header">
+                <span style={{ color: 'var(--red)', fontSize: '0.8rem' }}>▼</span>
+                <span className="panel-header-title" style={{ color: 'var(--red)' }}>Worst Substituent</span>
+              </div>
+              <div className="panel-body">
+                <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-code)',
+                  wordBreak: 'break-all' }}>
+                  {worst[selPos]}
+                </code>
+              </div>
             </div>
           )}
         </div>
