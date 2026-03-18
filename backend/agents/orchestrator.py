@@ -29,6 +29,7 @@ from .enumeration_agent import EnumerationAgent
 from .activity_cliff_agent import ActivityCliffAgent
 from .scaffold_agent import ScaffoldAgent
 from .report_agent import ReportAgent
+from .reinvent4_agent import Reinvent4Agent
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ class OrchestratorAgent(BaseAgent):
         property_of_interest: Optional[str] = None,
         run_enumeration: bool = False,
         core_smarts: Optional[str] = None,
+        run_generative: bool = False,
+        generative_config=None,  # Optional[GenerativeConfig]
     ) -> Dict[str, Any]:
         """
         Execute the full analysis pipeline.
@@ -76,6 +79,8 @@ class OrchestratorAgent(BaseAgent):
             property_of_interest: Which property to rank R-groups by
             run_enumeration:      Whether to enumerate virtual library
             core_smarts:          User-supplied core SMARTS (optional)
+            run_generative:       Whether to run REINVENT4 generative design
+            generative_config:    GenerativeConfig instance (uses defaults if None)
 
         Returns:
             Full analysis results dict
@@ -176,6 +181,35 @@ class OrchestratorAgent(BaseAgent):
             )
             pipeline_results["scaffold_analysis"] = scaffold_result
             pipeline_results["agents_run"].append("ScaffoldAgent")
+
+        # ── 3b. Generative Design (optional, requires detected core) ────────────
+        if run_generative:
+            detected_core = core_smarts or core_result.get("mcs_smarts")
+            if detected_core:
+                from backend.api.routes.analyze import GenerativeConfig
+                emit("Generative: Running REINVENT4 scaffold decoration...")
+                try:
+                    reinvent4_agent = Reinvent4Agent(
+                        client=self.client,
+                        progress_callback=self.progress_callback,
+                    )
+                    generative_result = reinvent4_agent.run(
+                        core_smarts=detected_core,
+                        sar_data=pipeline_results.get("sar_ranking", {}),
+                        properties=properties,
+                        property_of_interest=property_of_interest,
+                        generative_config=generative_config or GenerativeConfig(),
+                    )
+                    pipeline_results["generative"] = generative_result
+                    pipeline_results["agents_run"].append("Reinvent4Agent")
+                except Exception as e:
+                    logger.error(f"Reinvent4Agent failed: {e}", exc_info=True)
+                    pipeline_results["generative"] = {"error": str(e)}
+            else:
+                emit("Generative: skipped — no core scaffold detected")
+                pipeline_results["generative"] = {
+                    "error": "No core scaffold detected for generative design"
+                }
 
         # ── 4. Activity Cliff Detection (always runs) ────────────────────────
         if property_of_interest and property_of_interest in properties:
