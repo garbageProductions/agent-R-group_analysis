@@ -5,6 +5,7 @@ import ConfigPage   from './pages/ConfigPage.jsx'
 import ResultsPage  from './pages/ResultsPage.jsx'
 import ChatPage     from './pages/ChatPage.jsx'
 import DocsPage     from './pages/DocsPage.jsx'
+import DataSidePanel from './components/DataSidePanel.jsx'
 
 /**
  * App — top-level page router + pipeline flow state.
@@ -31,6 +32,7 @@ export default function App() {
     generativeIterations: 5,
     generativeSteps: 500,
   })
+  const [sidePanelOpen, setSidePanelOpen] = useState(false)
 
   // Persist pipeline session across page refreshes
   useEffect(() => {
@@ -121,6 +123,18 @@ export default function App() {
         {page === 'docs' && <DocsPage />}
 
       </main>
+
+      {uploadData && (
+        <DataSidePanel
+          sessionId={uploadData.session_id}
+          labels={uploadData.all_labels || uploadData.sample_labels || []}
+          propertyColumns={uploadData.property_columns || []}
+          properties={uploadData.properties || {}}
+          sampleSvgs={uploadData.sample_svgs || []}
+          isOpen={sidePanelOpen}
+          onToggle={() => setSidePanelOpen(o => !o)}
+        />
+      )}
     </div>
   )
 }
