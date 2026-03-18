@@ -37,6 +37,19 @@ export async function uploadFile(file) {
 
 export const getSession = (sessionId) => request(`/upload/session/${sessionId}`)
 
+export async function uploadActivityFile(sessionId, file) {
+  const form = new FormData()
+  form.append('session_id', sessionId)
+  form.append('file', file)
+  const res = await fetch(`${BASE}/upload/activity`, { method: 'POST', body: form })
+  if (!res.ok) {
+    let detail = res.statusText
+    try { const body = await res.json(); detail = body.detail || detail } catch {}
+    throw new Error(detail)
+  }
+  return res.json()
+}
+
 // ── Analysis ──────────────────────────────────────────────────
 export function startAnalysis({ sessionId, propertyOfInterest, coreSmarts, runEnumeration, similarityThreshold, activityDiffThreshold, runGenerative, generativeConfig }) {
   return request('/analyze/start', {
