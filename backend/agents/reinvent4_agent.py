@@ -9,9 +9,11 @@ with max_iterations=40 to accommodate multi-iteration RL runs.
 import json
 import logging
 import os
+import re
+import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import anthropic
 
@@ -20,6 +22,9 @@ from .convergence_subagent import ConvergenceSubagent
 from backend.utils.qsar_trainer import QSARTrainer, QSARTrainingFailed
 from backend.utils import reinvent4_utils
 from backend.utils.reinvent4_utils import Reinvent4RunFailed
+
+if TYPE_CHECKING:
+    from backend.api.routes.analyze import GenerativeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,15 @@ class Reinvent4Agent(BaseAgent):
     Drives an iterative optimization loop, detecting convergence/minima
     and adapting scoring strategy via Claude reasoning.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Per-run state — reset on each call to run()
+        self._exec_path: Optional[str] = None
+        self._generative_config: Optional["GenerativeConfig"] = None
+        self._iteration_history: List[Dict] = []
+        self._work_dir: Optional[Path] = None
+        self._convergence_subagent: Optional[ConvergenceSubagent] = None
 
     @property
     def name(self) -> str:
@@ -170,7 +184,7 @@ class Reinvent4Agent(BaseAgent):
         sar_data: Dict[str, Any],
         properties: Dict[str, List],
         property_of_interest: Optional[str],
-        generative_config,  # GenerativeConfig instance
+        generative_config: "GenerativeConfig",
     ) -> Dict[str, Any]:
         """
         Execute the REINVENT4 scaffold decoration loop.
@@ -187,8 +201,9 @@ class Reinvent4Agent(BaseAgent):
 
         self._exec_path = exec_path
         self._generative_config = generative_config
-        self._iteration_history: List[Dict] = []
-        self._work_dir = Path(tempfile.mkdtemp(prefix="reinvent4_"))
+        self._iteration_history = []
+        tmp_dir = tempfile.mkdtemp(prefix="reinvent4_")
+        self._work_dir = Path(tmp_dir)
         self._convergence_subagent = ConvergenceSubagent(client=self.client, model=self.model)
 
         # Build the task prompt for Claude
@@ -199,69 +214,71 @@ class Reinvent4Agent(BaseAgent):
 
         self._emit_progress("Reinvent4Agent: starting scaffold decoration loop")
 
-        iterations = 0
-        while iterations < MAX_ITERATIONS:
-            iterations += 1
+        try:
+            iterations = 0
+            while iterations < MAX_ITERATIONS:
+                iterations += 1
 
-            try:
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    system=system,
-                    tools=tools,
-                    messages=messages,
-                )
-            except anthropic.APIError as e:
-                logger.error(f"Claude API error in Reinvent4Agent: {e}")
-                return {"error": str(e), "agent": self.name}
-
-            if response.stop_reason == "end_turn":
-                text_blocks = [b.text for b in response.content if hasattr(b, "text")]
-                final_text = "\n".join(text_blocks)
-                self._emit_progress("Reinvent4Agent: complete")
                 try:
-                    import re
-                    # Try markdown-fenced JSON first
-                    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", final_text, re.DOTALL)
-                    if json_match:
-                        return json.loads(json_match.group(1))
-                    # Try bare JSON (entire text is JSON)
-                    stripped = final_text.strip()
-                    if stripped.startswith("{"):
-                        return json.loads(stripped)
-                    # Fall back to finding first { ... last }
-                    start = final_text.find("{")
-                    end = final_text.rfind("}") + 1
-                    if start >= 0 and end > start:
-                        return json.loads(final_text[start:end])
-                except (json.JSONDecodeError, ValueError):
-                    pass
-                return {"result": final_text, "agent": self.name}
+                    response = self.client.messages.create(
+                        model=self.model,
+                        max_tokens=self.max_tokens,
+                        system=system,
+                        tools=tools,
+                        messages=messages,
+                    )
+                except anthropic.APIError as e:
+                    logger.error(f"Claude API error in Reinvent4Agent: {e}")
+                    return {"error": str(e), "agent": self.name}
 
-            if response.stop_reason == "tool_use":
-                tool_results = []
-                messages.append({"role": "assistant", "content": response.content})
-                for block in response.content:
-                    if block.type != "tool_use":
-                        continue
-                    self._emit_progress(f"Reinvent4Agent: calling tool {block.name}")
+                if response.stop_reason == "end_turn":
+                    text_blocks = [b.text for b in response.content if hasattr(b, "text")]
+                    final_text = "\n".join(text_blocks)
+                    self._emit_progress("Reinvent4Agent: complete")
                     try:
-                        result = self.execute_tool(block.name, block.input)
-                        content = json.dumps(result, default=str)
-                    except Exception as e:
-                        logger.error(f"Tool {block.name} failed: {e}", exc_info=True)
-                        content = json.dumps({"error": str(e), "tool": block.name})
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": content,
-                    })
-                messages.append({"role": "user", "content": tool_results})
-            else:
-                logger.warning(f"Unexpected stop_reason: {response.stop_reason}")
-                break
+                        # Try markdown-fenced JSON first
+                        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", final_text, re.DOTALL)
+                        if json_match:
+                            return json.loads(json_match.group(1))
+                        # Try bare JSON (entire text is JSON)
+                        stripped = final_text.strip()
+                        if stripped.startswith("{"):
+                            return json.loads(stripped)
+                        # Fall back to finding first { ... last }
+                        start = final_text.find("{")
+                        end = final_text.rfind("}") + 1
+                        if start >= 0 and end > start:
+                            return json.loads(final_text[start:end])
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                    return {"result": final_text, "agent": self.name}
 
-        return {"error": "Max iterations reached", "agent": self.name}
+                if response.stop_reason == "tool_use":
+                    tool_results = []
+                    messages.append({"role": "assistant", "content": response.content})
+                    for block in response.content:
+                        if block.type != "tool_use":
+                            continue
+                        self._emit_progress(f"Reinvent4Agent: calling tool {block.name}")
+                        try:
+                            result = self.execute_tool(block.name, block.input)
+                            content = json.dumps(result, default=str)
+                        except Exception as e:
+                            logger.error(f"Tool {block.name} failed: {e}", exc_info=True)
+                            content = json.dumps({"error": str(e), "tool": block.name})
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": content,
+                        })
+                    messages.append({"role": "user", "content": tool_results})
+                else:
+                    logger.warning(f"Unexpected stop_reason: {response.stop_reason}")
+                    break
+
+            return {"error": "Max iterations reached", "agent": self.name}
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # ── Tool implementations ──────────────────────────────────────────────────
 
@@ -360,7 +377,7 @@ class Reinvent4Agent(BaseAgent):
         sar_data: Dict,
         properties: Dict,
         property_of_interest: Optional[str],
-        config,
+        config: "GenerativeConfig",
     ) -> str:
         activity_data = []
         if property_of_interest and property_of_interest in properties:
