@@ -23,6 +23,8 @@ class DatasetPreview(BaseModel):
     property_columns: list
     sample_smiles: list
     sample_labels: list
+    all_labels: list          # full label list (all molecules)
+    properties: dict          # column-keyed property values { col: [val, ...] }
     sample_svgs: list
     errors: list
 
@@ -83,6 +85,8 @@ async def upload_file(
         property_columns=dataset.property_columns,
         sample_smiles=dataset.smiles[:sample_n],
         sample_labels=dataset.labels[:sample_n],
+        all_labels=dataset.labels,
+        properties=dataset.properties,
         sample_svgs=sample_svgs,
         errors=dataset.errors[:10],
     )
@@ -164,6 +168,32 @@ async def upload_activity_file(
         property_columns=session["property_columns"],
         sample_smiles=session["smiles"][:sample_n],
         sample_labels=session["labels"][:sample_n],
+        all_labels=session["labels"],
+        properties=session["properties"],
         sample_svgs=sample_svgs,
         errors=[],
     )
+
+
+@router.get("/session/{session_id}/svg/{mol_index}")
+async def get_molecule_svg(
+    session_id: str,
+    mol_index: int,
+    width: int = 48,
+    height: int = 36,
+):
+    """
+    Render a single molecule from the session as SVG.
+    Used by the DataSidePanel before analysis has run.
+    """
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = _sessions[session_id]
+    smiles_list = session["smiles"]
+    if mol_index < 0 or mol_index >= len(smiles_list):
+        raise HTTPException(status_code=404, detail=f"Molecule index {mol_index} out of range")
+    from fastapi.responses import Response
+    svg = mol_to_svg(smiles_list[mol_index], width=width, height=height)
+    if svg is None:
+        raise HTTPException(status_code=422, detail="SVG generation failed for this molecule")
+    return Response(content=svg, media_type="image/svg+xml")
