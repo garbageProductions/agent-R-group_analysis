@@ -102,6 +102,19 @@ async def _run_pipeline(request: AnalysisRequest, session_data: dict, api_key: s
             "results": results,
             "progress": progress_messages,
         }
+
+        # ── Auto-save HTML report ────────────────────────────────────────────
+        try:
+            from backend.utils.report_generator import ReportGenerator
+            from pathlib import Path
+            reports_dir = Path("data/reports")
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            report_html = ReportGenerator().generate(session_data, results)
+            (reports_dir / f"{sid}.html").write_text(report_html, encoding="utf-8")
+            logger.info("HTML report saved for session %s", sid)
+        except Exception:
+            logger.warning("Failed to write HTML report for session %s", sid, exc_info=True)
+
         store_results(sid, results)
 
     except Exception as e:
