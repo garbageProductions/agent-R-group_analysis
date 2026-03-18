@@ -1,6 +1,6 @@
 # UX Enhancement Package — Design Spec
 **Date:** 2026-03-17
-**Status:** Draft
+**Status:** Approved
 
 ## Overview
 
@@ -26,7 +26,7 @@ Every completed analysis auto-saves a fully self-contained HTML document to `dat
 - Output: a single HTML string with all assets inlined
 - Sections included:
   - Header: session ID, timestamp, molecule count, format
-  - Molecule grid: SVGs rendered via RDKit, embedded as inline SVG strings
+  - Molecule grid: SVGs rendered via RDKit, embedded as inline SVG strings (up to first 50 molecules to keep report size manageable)
   - Dataset stats: property columns, value distributions (simple inline `<table>`)
   - R-group decomposition: core SMARTS, frequency table
   - MMP transforms: top transforms table
@@ -36,35 +36,39 @@ Every completed analysis auto-saves a fully self-contained HTML document to `dat
 - SVGs are re-generated at report time (not cached from session) at 200×160
 
 **Modified: `backend/api/routes/analyze.py`**
-- After setting `_results[sid] = {"status": "complete", "results": pipeline_results}`, call:
+- In `_run_pipeline()`, after `_results[sid] = {"status": "complete", "results": pipeline_results}` (currently around line 100), add a report-write block. At this point `session_data` is already in scope as the return value from `get_session_data(sid)`:
   ```python
-  from backend.utils.report_generator import ReportGenerator
-  from pathlib import Path
-  reports_dir = Path("data/reports")
-  reports_dir.mkdir(parents=True, exist_ok=True)
-  html = ReportGenerator().generate(session_data, pipeline_results)
-  (reports_dir / f"{sid}.html").write_text(html, encoding="utf-8")
+  try:
+      from backend.utils.report_generator import ReportGenerator
+      from pathlib import Path
+      reports_dir = Path("data/reports")
+      reports_dir.mkdir(parents=True, exist_ok=True)
+      html = ReportGenerator().generate(session_data, pipeline_results)
+      (reports_dir / f"{sid}.html").write_text(html, encoding="utf-8")
+  except Exception:
+      logger.warning("Failed to write HTML report for session %s", sid, exc_info=True)
   ```
-- Failure to write the report must NOT fail the analysis — wrap in `try/except` with a log warning.
+- Failure to write the report must NOT fail the analysis — the `try/except` ensures this.
 
 **New file: `backend/api/routes/reports.py`**
-- Router prefix: `/reports`
+- Router prefix: `/reports`, tags: `["reports"]`
 - `GET /reports/` — list all reports:
-  - Scans `data/reports/*.html`
-  - Returns `[{session_id, filename, size_bytes, modified_at}]` sorted by newest first
+  - Scans `data/reports/*.html`; if directory does not exist, returns `[]`
+  - Returns `[{session_id, filename, size_bytes, modified_at}]` sorted newest first
+  - `modified_at` as ISO-8601 string from `os.path.getmtime`
 - `GET /reports/{session_id}` — serve the report:
   - Reads `data/reports/{session_id}.html`
   - Returns `Response(content=html, media_type="text/html")`
   - 404 if file not found
 
-**Modified: `backend/api/main.py`**
-- Register the new `reports` router.
+**Modified: `backend/main.py`**
+- Import and register the new `reports` router with `app.include_router(reports.router, prefix="/api")`.
 
 ### Frontend
 
 **Modified: `frontend/src/api.js`**
-- Add `getReportUrl(sessionId)` → returns `"/reports/" + sessionId` (for direct link)
-- Add `listReports()` → `GET /reports/`
+- Add `getReportUrl(sessionId)` → returns `"/api/reports/" + sessionId` (direct link to serve HTML)
+- Add `listReports()` → `GET /api/reports/`
 
 **Modified: `frontend/src/pages/ResultsPage.jsx`**
 - Add "⬇ Download Report" button in the panel header actions area (next to existing DotMenu)
@@ -73,13 +77,14 @@ Every completed analysis auto-saves a fully self-contained HTML document to `dat
 
 **New file: `frontend/src/components/ReportsHistoryModal.jsx`**
 - Simple modal listing past reports from `listReports()`
-- Each row: session ID (truncated), date, link to open in new tab
+- Each row: session ID (truncated to 8 chars), date/time, "Open" link that opens the report in a new tab
+- Dismiss behavior: closes on overlay click, close button (✕), or Escape key
 - Triggered by the History button on ResultsPage
 
 ### Testing
-- Unit: `ReportGenerator.generate()` with a minimal fixture returns a string containing `<html`
-- Unit: `generate()` with empty results does not throw
-- Integration: `POST /analyze/start` on a test session → poll until complete → `GET /reports/{id}` returns 200 with HTML content-type
+- Unit: `ReportGenerator.generate()` with a minimal fixture (dict with `smiles`, `labels`, `property_columns` keys and a `results` dict) returns a string containing `<!DOCTYPE html`
+- Unit: `generate()` with empty `results` dict does not throw
+- Integration: `POST /analyze/start` on a test session → poll until complete → `GET /api/reports/{id}` returns 200 with `Content-Type: text/html`
 
 ---
 
@@ -91,21 +96,28 @@ Users whose structure file contains no numeric property columns can upload a sep
 ### Backend
 
 **Modified: `backend/utils/file_parsers.py`**
-- New function `parse_activity_csv(content: str, existing_labels: list[str]) -> tuple[list[str], list[dict]]`
-  - Reads CSV; auto-detects the label column (first non-numeric column, or column named `id`/`name`/`label`/`smiles`)
-  - Validates: at least one numeric column required
-  - Fuzzy-matches CSV labels to `existing_labels` (exact match first, then case-insensitive)
-  - Returns `(new_property_columns, updated_properties_list)` — one dict per molecule, matched by position in `existing_labels`; unmatched rows get `None` values
+- New function `parse_activity_csv(content: str, existing_labels: list[str]) -> tuple[list[str], dict[str, list]]`
+  - Reads CSV; auto-detects the label column (first non-numeric column, or column explicitly named `id`, `name`, `label`, or `smiles`)
+  - Validates: at least one numeric column required; raises `ValueError` with a descriptive message if not
+  - Matches CSV rows to `existing_labels` by exact match (then case-insensitive). Rows with no match are silently skipped; unmatched `existing_labels` get `None` for each new property
+  - Row-count mismatch: if the CSV has a different number of rows than `existing_labels`, returns 400 with the message `"Activity CSV has {n} rows but session has {m} molecules; counts must match or CSV must include label column for matching"` — this validation happens in the endpoint, not inside `parse_activity_csv`
+  - Returns column-oriented `(new_property_columns: list[str], new_properties: dict[str, list])` — matching the existing `properties` shape in `_sessions` (`Dict[str, List[Any]]`, one entry per column, values indexed by molecule position)
 
 **Modified: `backend/api/routes/upload.py`**
 - New endpoint `POST /upload/activity`:
   - Form fields: `session_id: str`, `file: UploadFile`
-  - Validates session exists
+  - Validates session exists (raises 404 if not)
+  - Decodes file content (UTF-8 with Latin-1 fallback, same as main upload)
+  - Validates CSV row count vs. session molecule count if CSV has no label column (see above)
   - Calls `parse_activity_csv(content, session["labels"])`
-  - Merges new property columns into `_sessions[sid]["property_columns"]`
-  - Merges property values into `_sessions[sid]["properties"]`
-  - Returns updated `DatasetPreview` (same model, now with updated `property_columns`)
-- New function in `api.js`: `uploadActivityFile(sessionId, file)`
+  - On `ValueError`: raises `HTTPException(status_code=400, detail=str(e))`
+  - On success: merges `new_property_columns` into `_sessions[sid]["property_columns"]` and `new_properties` into `_sessions[sid]["properties"]`
+  - Returns updated `DatasetPreview` (same Pydantic model, now with updated `property_columns` and `sample_svgs` from cache)
+
+**Modified: `frontend/src/api.js`**
+- Add `uploadActivityFile(sessionId, file)`:
+  - Posts `multipart/form-data` with `session_id` and `file` to `POST /api/upload/activity`
+  - Returns the updated `DatasetPreview` response
 
 ### Frontend
 
@@ -114,9 +126,9 @@ Users whose structure file contains no numeric property columns can upload a sep
   - Header: "＋ Add Activity Data (optional)" with a collapse toggle
   - Collapsed by default; user clicks to expand
   - When expanded: small dropzone accepting `.csv` only
-  - On file drop/select: calls `uploadActivityFile`, updates `uploadResult` state with the server response
+  - On file drop/select: calls `uploadActivityFile`, updates `uploadResult` state in the parent (`App.jsx` via the existing `onComplete`-style callback or by lifting `setUploadResult`)
   - On success: shows green "✓ Activity data loaded · N properties" confirmation and collapses
-  - On error: shows inline error message
+  - On error: shows inline error message in the same red-border style as the main upload error
 
 **Modified: `frontend/src/pages/ConfigPage.jsx`**
 - In the SAR Configuration panel, check `uploadResult.property_columns.length === 0`:
@@ -124,18 +136,20 @@ Users whose structure file contains no numeric property columns can upload a sep
     ```
     ⚠ No Activity Data
     SAR analysis requires numeric activity columns (pIC50, Ki, etc.).
-    [← Add Activity Data]  ← this button calls onBackToUpload()
+    [← Add Activity Data]
     ```
-  - The "Property of Interest" dropdown is disabled (grayed out) when no columns exist
+  - "← Add Activity Data" button calls `onBackToUpload()` prop
+  - The "Property of Interest" dropdown is disabled (opacity 0.4, pointer-events none) when no columns exist
 
 **Modified: `frontend/src/App.jsx`**
-- Add `onBackToUpload` callback that resets `step` to 1 while keeping `uploadResult.session_id`
+- Add `onBackToUpload` callback: calls `setStep('upload')` while preserving `uploadResult` (session_id and molecule data remain intact; user can add activity data then re-proceed to config)
 - Pass `onBackToUpload` to `ConfigPage`
+- Note: App.jsx also receives changes from Feature 3 (side panel state); those changes are additive and must be applied after Feature 2's changes to avoid conflicts.
 
 ### Testing
-- Unit: `parse_activity_csv` with a 3-row CSV returns correct property values
-- Unit: `parse_activity_csv` raises `ValueError` when no numeric columns detected
-- Integration: `POST /upload/activity` with valid CSV → session `property_columns` updated
+- Unit: `parse_activity_csv` with a 3-column CSV (label, pIC50, Ki) and matching `existing_labels` returns correct column-oriented dict
+- Unit: `parse_activity_csv` raises `ValueError` when no numeric columns are present
+- Integration: `POST /api/upload/activity` with valid CSV → `GET /api/upload/session/{id}` shows updated `property_columns`
 
 ---
 
@@ -146,46 +160,57 @@ A sortable molecule table with mini SVG thumbnails available as a persistent sid
 
 ### Architecture
 
-Pure frontend — no new backend endpoints required. Uses the existing `GET /results/{sessionId}/svg/{i}?width=48&height=36` endpoint for thumbnails (note: this endpoint requires analysis to be complete; for the upload page, use `GET /upload/session/{id}/mol3d/{i}` — wait, that's 3D; the upload route already returns `sample_svgs` for the first 8. We need a broader endpoint).
+Requires one new backend endpoint to serve individual molecule SVGs before analysis runs (the existing `GET /results/{sessionId}/svg/{i}` endpoint requires a completed analysis). The panel uses `sample_svgs` from the upload response for the first 8 molecules without fetching, and the new endpoint for the rest.
 
-**Required backend addition:**
-- New endpoint in `upload.py`: `GET /upload/session/{session_id}/svg/{mol_index}?width=48&height=36`
-  - Uses `mol_to_svg(smiles_list[mol_index], width, height)`
-  - Returns SVG response
-  - This enables the side panel to load thumbnails before analysis runs
+**Required backend addition in `backend/api/routes/upload.py`:**
+- New endpoint: `GET /upload/session/{session_id}/svg/{mol_index}`
+  - Query params: `width: int = 48`, `height: int = 36`
+  - Gets SMILES from `_sessions[sid]["smiles"][mol_index]`
+  - Calls `mol_to_svg(smiles, width=width, height=height)`
+  - Returns SVG response (`media_type="image/svg+xml"`)
+  - 404 if index out of range
 
 ### Frontend
 
 **New file: `frontend/src/components/DataSidePanel.jsx`**
 - Props:
-  - `sessionId: string`
-  - `labels: string[]`
+  - `sessionId: string` — used to build SVG fetch URLs
+  - `labels: string[]` — **full labels array** from `_sessions[sid]["labels"]` (all molecules, not just the sample 8); passed from `App.jsx` state which holds the full `uploadResult`
   - `propertyColumns: string[]`
   - `numMolecules: number`
   - `isOpen: boolean`
   - `onToggle: () => void`
 - Rendering:
-  - Fixed-position panel, right: 0, top: 0, height: 100vh
+  - Fixed-position panel, `right: 0`, `top: 0`, `height: 100vh`, `z-index: 100` (above page content, below any modal at z-index 200+)
   - Width: 340px when `isOpen`, 20px when closed (just the toggle tab)
-  - Toggle tab: cyan vertical strip with "TABLE" label, always visible
-  - When open: header with search input + close button, scrollable table body, footer with count
-- Table columns: `#` | Structure (48×36 SVG) | Label | ...one column per `propertyColumns`
-- Sorting: click any column header to sort ascending/descending; `#` column sorts by original index
-- Search: filters by label substring (case-insensitive)
-- SVG lazy loading: use `IntersectionObserver` — only fetch SVG when row enters viewport; show placeholder `div` until loaded
-- SVG fetch: `GET /upload/session/{sessionId}/svg/{i}?width=48&height=36`; use the `sample_svgs` from `uploadResult` for the first 8 without fetching
-- Transitions: CSS `width` transition 200ms ease for open/close
-- Z-index: above page content, below any modals
+  - CSS `width` transition: 200ms ease
+  - Toggle tab: cyan (#00c4d4) vertical strip with "TABLE" label (rotated text), always visible at right edge
+  - When open: header with title "Dataset Table" + search input + close (✕) button; scrollable table body; footer showing count + sort info
+- Table columns: `#` | Structure (48×36 img tag, src from SVG endpoint) | Label | one column per `propertyColumns`
+- Sorting: click column header toggles ascending/descending; active sort column shows ↑/↓ indicator; `#` column restores original index order
+- Search: controlled input filters rows by label substring, case-insensitive
+- SVG lazy loading: `IntersectionObserver` watches each table row; SVG `src` set to empty string until row enters viewport, then set to the endpoint URL. First 8 rows use `sample_svgs` from `uploadResult` directly (inline SVG or data URI) to avoid fetching. On fetch failure (non-200 or network error): show a 48×36 gray placeholder `div`, do not retry.
+- `sample_svgs` are passed as an additional prop `sampleSvgs: string[]` (from `uploadResult.sample_svgs`)
 
-**Modified: `frontend/src/App.jsx`**
+**Modified: `frontend/src/App.jsx`** (apply after Feature 2 changes)
 - Add `sidePanelOpen: boolean` state, default `false`
-- Add `onToggleSidePanel` handler
-- Render `<DataSidePanel>` at App root level (outside page routing), conditionally when `uploadResult` is not null
-- Pass `sidePanelOpen` and `onToggleSidePanel` down to pages that need a "TABLE" button in their header
+- Add `onToggleSidePanel` handler toggling `sidePanelOpen`
+- Render `<DataSidePanel>` at App root level (sibling of the page content div), conditionally rendered when `uploadResult` is not null. Pass: `sessionId={uploadResult.session_id}`, `labels={uploadResult.sample_labels}` — NOTE: `uploadResult.sample_labels` only contains the first 8 labels. To display all molecules, App.jsx must store and pass the full label list. The `POST /api/upload/` response includes `sample_labels` (first 8 only). The full labels are not currently returned by the API. See the **API change** below.
+- Note: `sessionStorage` currently caches `uploadData`. After Feature 2 adds activity columns, the cache will be updated because `uploadActivityFile` returns a new `DatasetPreview` and the caller updates `uploadResult` state, which triggers the existing `sessionStorage` effect.
+
+**Required API change for full labels:**
+- `backend/api/routes/upload.py` — modify `DatasetPreview` to include `all_labels: list[str]` (the full label list, not just sample)
+- The `POST /api/upload/` response adds `all_labels: dataset.labels` (all molecules)
+- `DataSidePanel` receives `labels={uploadResult.all_labels}`
+- `numMolecules` prop is therefore redundant with `labels.length` — remove it; derive count from `labels.length`
+
+**Modified: `frontend/src/api.js`**
+- Add `getSvgUrl(sessionId, index, width=48, height=36)` → returns `/api/upload/session/${sessionId}/svg/${index}?width=${width}&height=${height}`
 
 ### Testing
-- Manual: panel opens/closes, survives navigation from UploadPage → ConfigPage
-- Unit: sort logic for numeric and string columns
+- Unit: sort function correctly sorts numeric columns ascending/descending
+- Unit: sort function correctly sorts string columns case-insensitively
+- Manual: panel opens/closes, state (open/closed, sort column, search text) survives navigation from UploadPage → ConfigPage → back to UploadPage
 
 ---
 
@@ -211,71 +236,101 @@ Interactive 3D molecular visualization embedded on UploadPage after file upload.
       mol = Chem.RemoveHs(mol)
       return Chem.MolToMolBlock(mol)
   ```
-- Returns `None` on any failure (invalid SMILES, embedding failure)
+- Returns `None` on any failure (invalid SMILES, embedding failure, MMFF failure)
 
 **Modified: `backend/api/routes/upload.py`**
 - New endpoint `GET /upload/session/{session_id}/mol3d/{mol_index}`:
-  - Gets SMILES from `_sessions[sid]["smiles"][mol_index]`
+  - Gets SMILES from `_sessions[sid]["smiles"][mol_index]`; raises 404 if index out of range
   - Calls `mol_to_3d_sdf(smiles)`
   - On success: returns `Response(content=sdf_str, media_type="chemical/x-mdl-sdfile")`
-  - On failure: returns `Response(content="", status_code=422)` (422 = unprocessable — 3D generation failed)
-- The endpoint is intentionally synchronous; 3D generation typically takes < 100ms per molecule
+  - On failure (`None` returned): returns HTTP 422 with `{"detail": "3D coordinate generation failed for this molecule"}`
+- The endpoint is synchronous; 3D generation typically takes < 200ms per molecule
 
 ### Frontend
 
 **New file: `frontend/src/components/MolStarViewer.jsx`**
-- Props: `sdfUrl: string | null`, `height: number`
-- Loads Mol\* from CDN via dynamic `<script>` injection in `useEffect`:
+- Props: `sdfUrl: string | null`, `height: number` (caller passes `320` for UploadPage context)
+- Loads Mol\* **pinned to a specific version** from CDN via dynamic `<script>` injection in `useEffect`:
   ```
-  https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js
+  https://cdn.jsdelivr.net/npm/molstar@3.45.0/build/viewer/molstar.js
   ```
-- Renders a `<div ref={viewerRef}>` container; initializes `molstar.Viewer.create(ref, {...})` once script loads
-- When `sdfUrl` changes: calls `viewer.loadStructureFromUrl(sdfUrl, 'sdf')` and applies default representation (ball-and-stick)
-- States: `loading` (spinner), `error` (inline message), `ready` (viewer)
-- Default representation: Ball+Stick; Surface toggle button calls `viewer.plugin.builders.structure.representation.addRepresentation`
-- Cleanup: destroys viewer on unmount
+  - Pin to `3.45.0` (or the latest `3.x` stable at implementation time — verify before committing). Do NOT use `@latest`.
+  - Also load the accompanying CSS: `molstar@3.45.0/build/viewer/molstar.css`
+- Renders a `<div ref={viewerRef}>` container sized to `width: "100%"`, `height: props.height`
+- Initializes viewer once script+CSS load:
+  ```js
+  const viewer = await molstar.Viewer.create(viewerRef.current, {
+    layoutIsExpanded: false,
+    layoutShowControls: false,
+    layoutShowSequence: false,
+    layoutShowLog: false,
+  })
+  ```
+- When `sdfUrl` changes and is non-null: fetch the SDF text, then load via:
+  ```js
+  await viewer.loadStructureFromData(sdfText, 'mol', { representationParams: { type: 'ball-and-stick' } })
+  ```
+  - Note: Mol\* 3.x uses `loadStructureFromData(data, format, options)` where `format = 'mol'` handles SDF/MOL. Verify the exact API call against the pinned version during implementation; fall back to `loadStructureFromUrl` if `loadStructureFromData` is unavailable.
+- States:
+  - `loading` — spinner while script loads or SDF is fetching
+  - `error` — shows inline message "3D structure unavailable" if fetch returns 422 or script fails to load
+  - `ready` — Mol\* viewer rendered and interactive
+- Surface toggle button: calls `viewer.plugin.managers.structure.component.updateRepresentationsTheme(...)` or equivalent in the pinned version; verify exact API at implementation time
+- Cleanup on unmount: `viewer.plugin.dispose()`
 
 **Modified: `frontend/src/pages/UploadPage.jsx`**
-- When `uploadResult` is set, render a new collapsible "3D Viewer" section below the molecule preview grid:
-  - Layout: two columns (on screens > 900px), single column otherwise
-    - Left column (200px): scrollable list of all molecules, same 2D SVG cards as current grid
-    - Right column (remaining): `<MolStarViewer>` component
-  - `selected3dIndex` state (default: `0`)
-  - Clicking a 2D card sets `selected3dIndex`
-  - `sdfUrl` passed to viewer: `/upload/session/{sessionId}/mol3d/{selected3dIndex}`
-- The section has a collapse toggle ("⬡ 3D Viewer ▼") so users who don't need 3D can hide it
-- Default state: collapsed (to keep the page fast for users who don't need 3D)
+- When `uploadResult` is set, render a collapsible "⬡ 3D Viewer" section below the 2D molecule grid
+- Default state: **collapsed** (users who don't need 3D skip it; avoids loading Mol\* CDN script until explicitly opened)
+- When expanded, layout:
+  - Two-column on viewport width ≥ 900px: left column 200px (scrollable 2D card list), right column (flex-1, min-width 0) holds `<MolStarViewer height={320} />`
+  - Single-column stacked on narrower viewports
+- `selected3dIndex` state (default: `0`, auto-selects first molecule)
+- Clicking a 2D card sets `selected3dIndex`; the selected card gets a cyan border highlight
+- `sdfUrl` passed to viewer: `getMol3dUrl(sessionId, selected3dIndex)` from `api.js`
+- The 2D card list shows all molecules (uses `all_labels` from Feature 3's API change); SVGs use `sample_svgs` for first 8, then `getSvgUrl` for the rest — consistent with the side panel approach
 
 **Modified: `frontend/src/api.js`**
-- Add `getMol3dUrl(sessionId, index)` → returns the endpoint path string
+- Add `getMol3dUrl(sessionId, index)` → returns `/api/upload/session/${sessionId}/mol3d/${index}`
 
 ### Testing
 - Unit: `mol_to_3d_sdf("c1ccccc1")` returns a non-None string containing `$$$$`
 - Unit: `mol_to_3d_sdf("not_a_smiles")` returns `None`
-- Integration: `GET /upload/session/{id}/mol3d/0` after uploading a valid SDF returns 200 with SDF content
+- Integration: `GET /api/upload/session/{id}/mol3d/0` after uploading a valid SDF returns 200 with `Content-Type: chemical/x-mdl-sdfile`
+- Integration: `GET /api/upload/session/{id}/mol3d/0` for a molecule with a macrocycle or unusual structure returns 422 gracefully
 
 ---
 
 ## Cross-Cutting Concerns
 
 ### `data/reports/` directory
-- Created automatically on first use (with `mkdir parents=True, exist_ok=True`)
-- Add `data/reports/` to `.gitignore` — reports should not be committed
+- Created automatically on first use in `ReportGenerator` caller (with `mkdir(parents=True, exist_ok=True)`)
+- Add `data/reports/` to the **root `.gitignore`** file — reports should not be committed to git
+
+### App.jsx change sequencing
+- Feature 2 adds `onBackToUpload` callback and passes it to `ConfigPage`
+- Feature 3 adds `sidePanelOpen` state, `onToggleSidePanel` handler, and renders `<DataSidePanel>` at root
+- Feature 3 also adds `all_labels` to the upload response and state
+- These changes to `App.jsx` must be applied sequentially (Feature 2 first, then Feature 3) to avoid conflicts
+
+### `sessionStorage` cache consistency
+- `App.jsx` currently caches `uploadData` (= `uploadResult`) in `sessionStorage`
+- After Feature 2, when `uploadActivityFile` returns an updated `DatasetPreview`, the caller updates `uploadResult` state in `App.jsx`, which automatically triggers the existing `sessionStorage` effect — no extra work needed
 
 ### Error handling philosophy
 - Report generation failure: log warning, do NOT fail the analysis response
-- 3D coord generation failure: return 422, frontend shows "3D not available" fallback
+- 3D coord generation failure: return 422, frontend shows "3D not available" message
 - Activity CSV parse failure: return 400 with descriptive error message
 - Side panel SVG fetch failure: show gray placeholder square, do not retry
 
 ### Build order rationale
-1. **SAR pathway first** — highest clinical value, tests the secondary upload pattern
-2. **Side panel second** — pure frontend, no risk of breaking backend
-3. **HTML reports third** — adds ReportGenerator (new file, isolated)
-4. **Mol\* viewer last** — requires new CDN dep and 3D coordinate generation; most risk
+1. **SAR pathway first** — highest user value, validates the secondary upload pattern
+2. **Side panel second** — mostly pure frontend after the one new SVG endpoint
+3. **HTML reports third** — isolated new file (`ReportGenerator`), no frontend-backend coupling changes
+4. **Mol\* viewer last** — new CDN dependency, 3D coordinate generation, most integration risk
 
 ### Out of scope
-- Project-level persistence (multiple sessions grouped into a "project") — future work
+- Project-level persistence (multiple sessions grouped into a named "project") — future work
 - Real-time collaborative viewing
 - Export formats other than HTML (PDF, JSON)
 - Mol\* viewer in ResultsPage (UploadPage only for now)
+- Mol\* viewer for generated molecules in GeneratedMoleculesPanel
