@@ -106,3 +106,7 @@ export const deleteChatSession = (id) => request(`/chat/history/${id}`, { method
 // ── Reports ────────────────────────────────────────────────────────────────
 export const getReportUrl  = (sessionId) => `${BASE}/reports/${sessionId}`
 export const listReports   = () => request('/reports/')
+
+// ── 3D viewer ──────────────────────────────────────────────────────────────
+export const getMol3dUrl = (sessionId, index) =>
+  `${BASE}/upload/session/${sessionId}/mol3d/${index}`

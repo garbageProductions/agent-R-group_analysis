@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
-import { uploadFile, uploadActivityFile } from '../api.js'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { uploadFile, uploadActivityFile, getMol3dUrl } from '../api.js'
 import DotMenu from '../components/DotMenu.jsx'
+import MolStarViewer from '../components/MolStarViewer.jsx'
 
 export default function UploadPage({ onComplete, initialUploadResult = null }) {
   const [dragging, setDragging] = useState(false)
@@ -14,6 +15,17 @@ export default function UploadPage({ onComplete, initialUploadResult = null }) {
   const [activityError, setActivityError] = useState(null)
   const [activitySuccess, setActivitySuccess] = useState(null)
   const activityInputRef = useRef()
+
+  const [viewer3dOpen, setViewer3dOpen]       = useState(false)
+  const [selected3dIndex, setSelected3dIndex] = useState(0)
+  const [viewerWide, setViewerWide]           = useState(typeof window !== 'undefined' ? window.innerWidth >= 900 : true)
+
+  // Update layout on resize — avoids stale window.innerWidth in render
+  useEffect(() => {
+    const handler = () => setViewerWide(window.innerWidth >= 900)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const handleFile = useCallback(async (file) => {
     if (!file) return
@@ -164,6 +176,70 @@ export default function UploadPage({ onComplete, initialUploadResult = null }) {
                     {activityError}
                   </p>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 3D Viewer section ── */}
+          <div className="panel" style={{ marginBottom: 14 }}>
+            <div
+              className="panel-header"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setViewer3dOpen(o => !o)}
+            >
+              <span style={{ fontSize: '0.8rem', color: 'var(--purple, #a78bfa)' }}>&#11041;</span>
+              <span className="panel-header-title">3D Viewer</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                {viewer3dOpen ? '▲' : '▼'}
+              </span>
+            </div>
+            {viewer3dOpen && (
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+                <div style={{
+                  display: 'flex',
+                  gap: 12,
+                  flexDirection: viewerWide ? 'row' : 'column',
+                }}>
+                  {/* 2D molecule list */}
+                  <div style={{
+                    width: viewerWide ? 200 : '100%',
+                    flexShrink: 0,
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}>
+                    {(uploadResult.all_labels || uploadResult.sample_labels || []).map((label, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setSelected3dIndex(i)}
+                        style={{
+                          background: 'var(--bg, #0d1117)',
+                          border: `1px solid ${selected3dIndex === i ? 'var(--nanome-cyan, #00c4d4)' : 'var(--border, #30363d)'}`,
+                          borderRadius: 6,
+                          padding: 6,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {uploadResult.sample_svgs[i]
+                          ? <span dangerouslySetInnerHTML={{ __html: uploadResult.sample_svgs[i] }} style={{ display: 'block', width: '100%', height: 55 }} />
+                          : <div style={{ width: '100%', height: 55, background: 'var(--bg-secondary, #161b22)', borderRadius: 2 }} />}
+                        <div style={{ fontSize: '0.62rem', color: selected3dIndex === i ? 'var(--nanome-cyan, #00c4d4)' : 'var(--text-muted, #8b949e)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Mol* viewer */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <MolStarViewer
+                      sdfUrl={getMol3dUrl(uploadResult.session_id, selected3dIndex)}
+                      height={320}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
