@@ -307,6 +307,8 @@ def parse_activity_csv(
         lbl = row.get(label_col, "").strip() if label_col else None
         if not lbl:
             continue
+        if lbl in csv_data:
+            raise ValueError(f"Duplicate label in activity CSV: {lbl!r}")
         entry: Dict[str, Any] = {}
         for col in prop_cols:
             val_str = row.get(col, "").strip()

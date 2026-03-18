@@ -71,3 +71,9 @@ def test_raises_value_error_when_no_numeric_columns():
     content = "id,name,category\nmol1,compound_a,type1\n"
     with pytest.raises(ValueError, match="numeric"):
         parse_activity_csv(content, ["mol1"])
+
+
+def test_raises_value_error_on_duplicate_label():
+    content = "id,pIC50\nmol1,8.4\nmol1,7.9\n"
+    with pytest.raises(ValueError, match="[Dd]uplicate"):
+        parse_activity_csv(content, ["mol1"])
