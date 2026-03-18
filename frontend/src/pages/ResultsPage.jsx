@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getResults, startAnalysis } from '../api.js'
+import { getResults, startAnalysis, getReportUrl } from '../api.js'
+import ReportsHistoryModal from '../components/ReportsHistoryModal.jsx'
 import ProgressPanel       from '../components/ProgressPanel.jsx'
 import MoleculeGrid        from '../components/MoleculeGrid.jsx'
 import RGroupTable         from '../components/RGroupTable.jsx'
@@ -30,6 +31,7 @@ export default function ResultsPage({ sessionId, config, isAnalysing, onComplete
   const [results,      setResults]      = useState(null)
   const [loadErr,      setLoadErr]      = useState(null)
   const [analysisErr,  setAnalysisErr]  = useState(null)
+  const [showHistory,  setShowHistory]  = useState(false)
 
   const fetchResults = useCallback(() => {
     if (!sessionId) return
@@ -144,6 +146,20 @@ export default function ResultsPage({ sessionId, config, isAnalysing, onComplete
                   {STRATEGY_LABELS[results.strategy] || results.strategy}
                 </span>
               )}
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                onClick={() => window.open(getReportUrl(sessionId), '_blank')}
+              >
+                ⬇ Download Report
+              </button>
+              <button
+                className="btn"
+                style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                onClick={() => setShowHistory(true)}
+              >
+                📋 History
+              </button>
               <button className="btn btn-ghost btn-sm" onClick={onReset} style={{ gap: 5 }}>
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path d="M1 5a4 4 0 1 0 1-2.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -377,6 +393,7 @@ export default function ResultsPage({ sessionId, config, isAnalysing, onComplete
           </div>
         </>
       )}
+      {showHistory && <ReportsHistoryModal onClose={() => setShowHistory(false)} />}
     </div>
   )
 }

@@ -102,3 +102,7 @@ export const patchChatSession  = (id, body) => request(`/chat/history/${id}`, {
   method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 })
 export const deleteChatSession = (id) => request(`/chat/history/${id}`, { method: 'DELETE' })
+
+// ── Reports ────────────────────────────────────────────────────────────────
+export const getReportUrl  = (sessionId) => `${BASE}/reports/${sessionId}`
+export const listReports   = () => request('/reports/')
