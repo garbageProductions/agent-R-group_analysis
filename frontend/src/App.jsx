@@ -69,6 +69,12 @@ export default function App() {
     sessionStorage.removeItem('rg_session')
   }
 
+  function handleBackToUpload() {
+    // Return to upload step keeping the existing session intact so
+    // the user can add activity data and re-proceed to config.
+    setStep('upload')
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <GlobalHeader
@@ -83,7 +89,10 @@ export default function App() {
 
         {/* ── Pipeline page ── */}
         {page === 'pipeline' && step === 'upload' && (
-          <UploadPage onComplete={handleUploadComplete} />
+          <UploadPage
+            onComplete={handleUploadComplete}
+            initialUploadResult={uploadData}
+          />
         )}
         {page === 'pipeline' && step === 'config' && (
           <ConfigPage
@@ -92,6 +101,7 @@ export default function App() {
             setConfig={setConfig}
             onStart={handleAnalysisStarted}
             onBack={() => setStep('upload')}
+            onBackToUpload={handleBackToUpload}
           />
         )}
         {page === 'pipeline' && (step === 'analysis' || step === 'results') && (

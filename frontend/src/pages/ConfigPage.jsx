@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { startAnalysis } from '../api.js'
 import Toggle from '../components/Toggle.jsx'
 
-export default function ConfigPage({ uploadData, config, setConfig, onStart, onBack }) {
+export default function ConfigPage({ uploadData, config, setConfig, onStart, onBack, onBackToUpload }) {
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState(null)
 
@@ -87,10 +87,48 @@ export default function ConfigPage({ uploadData, config, setConfig, onStart, onB
                 <span className="panel-header-title">SAR Configuration</span>
               </div>
               <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="field">
+                {/* SAR warning: no activity data */}
+              {propCols.length === 0 && (
+                <div style={{
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  borderRadius: 'var(--radius)',
+                  padding: '10px 14px',
+                  marginBottom: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span>⚠</span>
+                    <span style={{ fontWeight: 600, color: '#f59e0b', fontSize: '0.82rem' }}>
+                      No Activity Data
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#f59e0b', margin: '0 0 8px' }}>
+                    SAR analysis requires numeric activity columns (pIC50, Ki, IC50, etc.).
+                    Ensure your SDF contains property fields, or upload a separate activity CSV.
+                  </p>
+                  {onBackToUpload && (
+                    <button
+                      className="btn"
+                      style={{
+                        background: 'rgba(245,158,11,0.1)',
+                        color: '#f59e0b',
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        fontSize: '0.75rem',
+                        padding: '4px 10px',
+                      }}
+                      onClick={onBackToUpload}
+                    >
+                      ← Add Activity Data
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="field">
                   <label>Property of Interest</label>
                   {propCols.length > 0 ? (
                     <select className="select" value={config.propertyOfInterest}
+                      disabled={propCols.length === 0}
+                      style={{ opacity: propCols.length === 0 ? 0.4 : 1 }}
                       onChange={e => set('propertyOfInterest', e.target.value)}>
                       <option value="">— none —</option>
                       {propCols.map(col => <option key={col} value={col}>{col}</option>)}
